@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AllocationRouteImport } from './routes/allocation'
 import { Route as BackordersRouteImport } from './routes/backorders'
+import { Route as LoadVerificationRouteImport } from './routes/load-verification'
 import { Route as LoadingRouteImport } from './routes/loading'
 import { Route as PackingRouteImport } from './routes/packing'
 import { Route as PickListsRouteImport } from './routes/pick-lists'
@@ -35,6 +36,11 @@ const AllocationRoute = AllocationRouteImport.update({
 const BackordersRoute = BackordersRouteImport.update({
   id: '/backorders',
   path: '/backorders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoadVerificationRoute = LoadVerificationRouteImport.update({
+  id: '/load-verification',
+  path: '/load-verification',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoadingRoute = LoadingRouteImport.update({
@@ -87,6 +93,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/allocation': typeof AllocationRoute
   '/backorders': typeof BackordersRoute
+  '/load-verification': typeof LoadVerificationRoute
   '/loading': typeof LoadingRoute
   '/packing': typeof PackingRoute
   '/pick-lists': typeof PickListsRoute
@@ -101,6 +108,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/allocation': typeof AllocationRoute
   '/backorders': typeof BackordersRoute
+  '/load-verification': typeof LoadVerificationRoute
   '/loading': typeof LoadingRoute
   '/packing': typeof PackingRoute
   '/pick-lists': typeof PickListsRoute
@@ -116,6 +124,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/allocation': typeof AllocationRoute
   '/backorders': typeof BackordersRoute
+  '/load-verification': typeof LoadVerificationRoute
   '/loading': typeof LoadingRoute
   '/packing': typeof PackingRoute
   '/pick-lists': typeof PickListsRoute
@@ -132,6 +141,7 @@ export interface FileRouteTypes {
     | '/'
     | '/allocation'
     | '/backorders'
+    | '/load-verification'
     | '/loading'
     | '/packing'
     | '/pick-lists'
@@ -146,6 +156,7 @@ export interface FileRouteTypes {
     | '/'
     | '/allocation'
     | '/backorders'
+    | '/load-verification'
     | '/loading'
     | '/packing'
     | '/pick-lists'
@@ -160,6 +171,7 @@ export interface FileRouteTypes {
     | '/'
     | '/allocation'
     | '/backorders'
+    | '/load-verification'
     | '/loading'
     | '/packing'
     | '/pick-lists'
@@ -175,6 +187,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AllocationRoute: typeof AllocationRoute
   BackordersRoute: typeof BackordersRoute
+  LoadVerificationRoute: typeof LoadVerificationRoute
   LoadingRoute: typeof LoadingRoute
   PackingRoute: typeof PackingRoute
   PickListsRoute: typeof PickListsRoute
@@ -207,6 +220,13 @@ declare module '@tanstack/react-router' {
       path: '/backorders'
       fullPath: '/backorders'
       preLoaderRoute: typeof BackordersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/load-verification': {
+      id: '/load-verification'
+      path: '/load-verification'
+      fullPath: '/load-verification'
+      preLoaderRoute: typeof LoadVerificationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/loading': {
@@ -279,6 +299,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AllocationRoute: AllocationRoute,
   BackordersRoute: BackordersRoute,
+  LoadVerificationRoute: LoadVerificationRoute,
   LoadingRoute: LoadingRoute,
   PackingRoute: PackingRoute,
   PickListsRoute: PickListsRoute,
