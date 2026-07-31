@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AllocationRouteImport } from './routes/allocation'
 import { Route as BackordersRouteImport } from './routes/backorders'
+import { Route as PackingRouteImport } from './routes/packing'
 import { Route as PickListsRouteImport } from './routes/pick-lists'
 import { Route as PickingRouteImport } from './routes/picking'
 import { Route as SalesOrdersRouteImport } from './routes/sales-orders'
@@ -31,6 +32,11 @@ const AllocationRoute = AllocationRouteImport.update({
 const BackordersRoute = BackordersRouteImport.update({
   id: '/backorders',
   path: '/backorders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PackingRoute = PackingRouteImport.update({
+  id: '/packing',
+  path: '/packing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PickListsRoute = PickListsRouteImport.update({
@@ -63,6 +69,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/allocation': typeof AllocationRoute
   '/backorders': typeof BackordersRoute
+  '/packing': typeof PackingRoute
   '/pick-lists': typeof PickListsRoute
   '/picking': typeof PickingRoute
   '/sales-orders': typeof SalesOrdersRoute
@@ -73,6 +80,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/allocation': typeof AllocationRoute
   '/backorders': typeof BackordersRoute
+  '/packing': typeof PackingRoute
   '/pick-lists': typeof PickListsRoute
   '/picking': typeof PickingRoute
   '/sales-orders': typeof SalesOrdersRoute
@@ -84,6 +92,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/allocation': typeof AllocationRoute
   '/backorders': typeof BackordersRoute
+  '/packing': typeof PackingRoute
   '/pick-lists': typeof PickListsRoute
   '/picking': typeof PickingRoute
   '/sales-orders': typeof SalesOrdersRoute
@@ -96,6 +105,7 @@ export interface FileRouteTypes {
     | '/'
     | '/allocation'
     | '/backorders'
+    | '/packing'
     | '/pick-lists'
     | '/picking'
     | '/sales-orders'
@@ -106,6 +116,7 @@ export interface FileRouteTypes {
     | '/'
     | '/allocation'
     | '/backorders'
+    | '/packing'
     | '/pick-lists'
     | '/picking'
     | '/sales-orders'
@@ -116,6 +127,7 @@ export interface FileRouteTypes {
     | '/'
     | '/allocation'
     | '/backorders'
+    | '/packing'
     | '/pick-lists'
     | '/picking'
     | '/sales-orders'
@@ -127,6 +139,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AllocationRoute: typeof AllocationRoute
   BackordersRoute: typeof BackordersRoute
+  PackingRoute: typeof PackingRoute
   PickListsRoute: typeof PickListsRoute
   PickingRoute: typeof PickingRoute
   SalesOrdersRoute: typeof SalesOrdersRoute
@@ -155,6 +168,13 @@ declare module '@tanstack/react-router' {
       path: '/backorders'
       fullPath: '/backorders'
       preLoaderRoute: typeof BackordersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/packing': {
+      id: '/packing'
+      path: '/packing'
+      fullPath: '/packing'
+      preLoaderRoute: typeof PackingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pick-lists': {
@@ -199,6 +219,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AllocationRoute: AllocationRoute,
   BackordersRoute: BackordersRoute,
+  PackingRoute: PackingRoute,
   PickListsRoute: PickListsRoute,
   PickingRoute: PickingRoute,
   SalesOrdersRoute: SalesOrdersRoute,
