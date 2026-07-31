@@ -10,33 +10,245 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AllocationRouteImport } from './routes/allocation'
+import { Route as BackordersRouteImport } from './routes/backorders'
+import { Route as DispatchRouteImport } from './routes/dispatch'
+import { Route as LoadVerificationRouteImport } from './routes/load-verification'
+import { Route as LoadingRouteImport } from './routes/loading'
+import { Route as PackingRouteImport } from './routes/packing'
+import { Route as PickListsRouteImport } from './routes/pick-lists'
+import { Route as PickingRouteImport } from './routes/picking'
+import { Route as ReportsRouteImport } from './routes/reports'
+import { Route as SalesOrdersRouteImport } from './routes/sales-orders'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ShippingRouteImport } from './routes/shipping'
+import { Route as ShippingLabelsRouteImport } from './routes/shipping-labels'
+import { Route as StagingRouteImport } from './routes/staging'
+import { Route as WavePlanningRouteImport } from './routes/wave-planning'
+import { Route as WaveReleaseRouteImport } from './routes/wave-release'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AllocationRoute = AllocationRouteImport.update({
+  id: '/allocation',
+  path: '/allocation',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BackordersRoute = BackordersRouteImport.update({
+  id: '/backorders',
+  path: '/backorders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DispatchRoute = DispatchRouteImport.update({
+  id: '/dispatch',
+  path: '/dispatch',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoadVerificationRoute = LoadVerificationRouteImport.update({
+  id: '/load-verification',
+  path: '/load-verification',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoadingRoute = LoadingRouteImport.update({
+  id: '/loading',
+  path: '/loading',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PackingRoute = PackingRouteImport.update({
+  id: '/packing',
+  path: '/packing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PickListsRoute = PickListsRouteImport.update({
+  id: '/pick-lists',
+  path: '/pick-lists',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PickingRoute = PickingRouteImport.update({
+  id: '/picking',
+  path: '/picking',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsRoute = ReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SalesOrdersRoute = SalesOrdersRouteImport.update({
+  id: '/sales-orders',
+  path: '/sales-orders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShippingRoute = ShippingRouteImport.update({
+  id: '/shipping',
+  path: '/shipping',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShippingLabelsRoute = ShippingLabelsRouteImport.update({
+  id: '/shipping-labels',
+  path: '/shipping-labels',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StagingRoute = StagingRouteImport.update({
+  id: '/staging',
+  path: '/staging',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WavePlanningRoute = WavePlanningRouteImport.update({
+  id: '/wave-planning',
+  path: '/wave-planning',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WaveReleaseRoute = WaveReleaseRouteImport.update({
+  id: '/wave-release',
+  path: '/wave-release',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/allocation': typeof AllocationRoute
+  '/backorders': typeof BackordersRoute
+  '/dispatch': typeof DispatchRoute
+  '/load-verification': typeof LoadVerificationRoute
+  '/loading': typeof LoadingRoute
+  '/packing': typeof PackingRoute
+  '/pick-lists': typeof PickListsRoute
+  '/picking': typeof PickingRoute
+  '/reports': typeof ReportsRoute
+  '/sales-orders': typeof SalesOrdersRoute
+  '/settings': typeof SettingsRoute
+  '/shipping': typeof ShippingRoute
+  '/shipping-labels': typeof ShippingLabelsRoute
+  '/staging': typeof StagingRoute
+  '/wave-planning': typeof WavePlanningRoute
+  '/wave-release': typeof WaveReleaseRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/allocation': typeof AllocationRoute
+  '/backorders': typeof BackordersRoute
+  '/dispatch': typeof DispatchRoute
+  '/load-verification': typeof LoadVerificationRoute
+  '/loading': typeof LoadingRoute
+  '/packing': typeof PackingRoute
+  '/pick-lists': typeof PickListsRoute
+  '/picking': typeof PickingRoute
+  '/reports': typeof ReportsRoute
+  '/sales-orders': typeof SalesOrdersRoute
+  '/settings': typeof SettingsRoute
+  '/shipping': typeof ShippingRoute
+  '/shipping-labels': typeof ShippingLabelsRoute
+  '/staging': typeof StagingRoute
+  '/wave-planning': typeof WavePlanningRoute
+  '/wave-release': typeof WaveReleaseRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/allocation': typeof AllocationRoute
+  '/backorders': typeof BackordersRoute
+  '/dispatch': typeof DispatchRoute
+  '/load-verification': typeof LoadVerificationRoute
+  '/loading': typeof LoadingRoute
+  '/packing': typeof PackingRoute
+  '/pick-lists': typeof PickListsRoute
+  '/picking': typeof PickingRoute
+  '/reports': typeof ReportsRoute
+  '/sales-orders': typeof SalesOrdersRoute
+  '/settings': typeof SettingsRoute
+  '/shipping': typeof ShippingRoute
+  '/shipping-labels': typeof ShippingLabelsRoute
+  '/staging': typeof StagingRoute
+  '/wave-planning': typeof WavePlanningRoute
+  '/wave-release': typeof WaveReleaseRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/allocation'
+    | '/backorders'
+    | '/dispatch'
+    | '/load-verification'
+    | '/loading'
+    | '/packing'
+    | '/pick-lists'
+    | '/picking'
+    | '/reports'
+    | '/sales-orders'
+    | '/settings'
+    | '/shipping'
+    | '/shipping-labels'
+    | '/staging'
+    | '/wave-planning'
+    | '/wave-release'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/allocation'
+    | '/backorders'
+    | '/dispatch'
+    | '/load-verification'
+    | '/loading'
+    | '/packing'
+    | '/pick-lists'
+    | '/picking'
+    | '/reports'
+    | '/sales-orders'
+    | '/settings'
+    | '/shipping'
+    | '/shipping-labels'
+    | '/staging'
+    | '/wave-planning'
+    | '/wave-release'
+  id:
+    | '__root__'
+    | '/'
+    | '/allocation'
+    | '/backorders'
+    | '/dispatch'
+    | '/load-verification'
+    | '/loading'
+    | '/packing'
+    | '/pick-lists'
+    | '/picking'
+    | '/reports'
+    | '/sales-orders'
+    | '/settings'
+    | '/shipping'
+    | '/shipping-labels'
+    | '/staging'
+    | '/wave-planning'
+    | '/wave-release'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AllocationRoute: typeof AllocationRoute
+  BackordersRoute: typeof BackordersRoute
+  DispatchRoute: typeof DispatchRoute
+  LoadVerificationRoute: typeof LoadVerificationRoute
+  LoadingRoute: typeof LoadingRoute
+  PackingRoute: typeof PackingRoute
+  PickListsRoute: typeof PickListsRoute
+  PickingRoute: typeof PickingRoute
+  ReportsRoute: typeof ReportsRoute
+  SalesOrdersRoute: typeof SalesOrdersRoute
+  SettingsRoute: typeof SettingsRoute
+  ShippingRoute: typeof ShippingRoute
+  ShippingLabelsRoute: typeof ShippingLabelsRoute
+  StagingRoute: typeof StagingRoute
+  WavePlanningRoute: typeof WavePlanningRoute
+  WaveReleaseRoute: typeof WaveReleaseRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,22 +260,140 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/allocation': {
+      id: '/allocation'
+      path: '/allocation'
+      fullPath: '/allocation'
+      preLoaderRoute: typeof AllocationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/backorders': {
+      id: '/backorders'
+      path: '/backorders'
+      fullPath: '/backorders'
+      preLoaderRoute: typeof BackordersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dispatch': {
+      id: '/dispatch'
+      path: '/dispatch'
+      fullPath: '/dispatch'
+      preLoaderRoute: typeof DispatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/load-verification': {
+      id: '/load-verification'
+      path: '/load-verification'
+      fullPath: '/load-verification'
+      preLoaderRoute: typeof LoadVerificationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/loading': {
+      id: '/loading'
+      path: '/loading'
+      fullPath: '/loading'
+      preLoaderRoute: typeof LoadingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/packing': {
+      id: '/packing'
+      path: '/packing'
+      fullPath: '/packing'
+      preLoaderRoute: typeof PackingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pick-lists': {
+      id: '/pick-lists'
+      path: '/pick-lists'
+      fullPath: '/pick-lists'
+      preLoaderRoute: typeof PickListsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/picking': {
+      id: '/picking'
+      path: '/picking'
+      fullPath: '/picking'
+      preLoaderRoute: typeof PickingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports': {
+      id: '/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof ReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sales-orders': {
+      id: '/sales-orders'
+      path: '/sales-orders'
+      fullPath: '/sales-orders'
+      preLoaderRoute: typeof SalesOrdersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/shipping': {
+      id: '/shipping'
+      path: '/shipping'
+      fullPath: '/shipping'
+      preLoaderRoute: typeof ShippingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/shipping-labels': {
+      id: '/shipping-labels'
+      path: '/shipping-labels'
+      fullPath: '/shipping-labels'
+      preLoaderRoute: typeof ShippingLabelsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/staging': {
+      id: '/staging'
+      path: '/staging'
+      fullPath: '/staging'
+      preLoaderRoute: typeof StagingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/wave-planning': {
+      id: '/wave-planning'
+      path: '/wave-planning'
+      fullPath: '/wave-planning'
+      preLoaderRoute: typeof WavePlanningRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/wave-release': {
+      id: '/wave-release'
+      path: '/wave-release'
+      fullPath: '/wave-release'
+      preLoaderRoute: typeof WaveReleaseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AllocationRoute: AllocationRoute,
+  BackordersRoute: BackordersRoute,
+  DispatchRoute: DispatchRoute,
+  LoadVerificationRoute: LoadVerificationRoute,
+  LoadingRoute: LoadingRoute,
+  PackingRoute: PackingRoute,
+  PickListsRoute: PickListsRoute,
+  PickingRoute: PickingRoute,
+  ReportsRoute: ReportsRoute,
+  SalesOrdersRoute: SalesOrdersRoute,
+  SettingsRoute: SettingsRoute,
+  ShippingRoute: ShippingRoute,
+  ShippingLabelsRoute: ShippingLabelsRoute,
+  StagingRoute: StagingRoute,
+  WavePlanningRoute: WavePlanningRoute,
+  WaveReleaseRoute: WaveReleaseRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

@@ -11,6 +11,9 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { AppLayout } from "@/components/layout/app-layout";
+import { RoleProvider } from "@/context/role-context";
+import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
   return (
@@ -77,11 +80,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "NEXUS WMS — Outbound Fulfillment & Wave Management" },
+      {
+        name: "description",
+        content:
+          "Enterprise WMS module for outbound order fulfillment, wave planning, picking, packing, loading and dispatch.",
+      },
+      { name: "author", content: "NEXUS WMS" },
+      { property: "og:title", content: "NEXUS WMS — Outbound Fulfillment & Wave Management" },
+      {
+        property: "og:description",
+        content: "Wave planning, picking, packing, loading and dispatch control tower for enterprise warehouses.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@Lovable" },
@@ -119,8 +129,13 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      <RoleProvider>
+        <AppLayout>
+          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+          <Outlet />
+        </AppLayout>
+        <Toaster position="top-right" richColors />
+      </RoleProvider>
     </QueryClientProvider>
   );
 }
