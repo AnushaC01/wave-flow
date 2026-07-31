@@ -10,33 +10,80 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AllocationRouteImport } from './routes/allocation'
+import { Route as BackordersRouteImport } from './routes/backorders'
+import { Route as SalesOrdersRouteImport } from './routes/sales-orders'
+import { Route as WavePlanningRouteImport } from './routes/wave-planning'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AllocationRoute = AllocationRouteImport.update({
+  id: '/allocation',
+  path: '/allocation',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BackordersRoute = BackordersRouteImport.update({
+  id: '/backorders',
+  path: '/backorders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SalesOrdersRoute = SalesOrdersRouteImport.update({
+  id: '/sales-orders',
+  path: '/sales-orders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WavePlanningRoute = WavePlanningRouteImport.update({
+  id: '/wave-planning',
+  path: '/wave-planning',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/allocation': typeof AllocationRoute
+  '/backorders': typeof BackordersRoute
+  '/sales-orders': typeof SalesOrdersRoute
+  '/wave-planning': typeof WavePlanningRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/allocation': typeof AllocationRoute
+  '/backorders': typeof BackordersRoute
+  '/sales-orders': typeof SalesOrdersRoute
+  '/wave-planning': typeof WavePlanningRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/allocation': typeof AllocationRoute
+  '/backorders': typeof BackordersRoute
+  '/sales-orders': typeof SalesOrdersRoute
+  '/wave-planning': typeof WavePlanningRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    '/' | '/allocation' | '/backorders' | '/sales-orders' | '/wave-planning'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/allocation' | '/backorders' | '/sales-orders' | '/wave-planning'
+  id:
+    | '__root__'
+    | '/'
+    | '/allocation'
+    | '/backorders'
+    | '/sales-orders'
+    | '/wave-planning'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AllocationRoute: typeof AllocationRoute
+  BackordersRoute: typeof BackordersRoute
+  SalesOrdersRoute: typeof SalesOrdersRoute
+  WavePlanningRoute: typeof WavePlanningRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,22 +95,44 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/allocation': {
+      id: '/allocation'
+      path: '/allocation'
+      fullPath: '/allocation'
+      preLoaderRoute: typeof AllocationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/backorders': {
+      id: '/backorders'
+      path: '/backorders'
+      fullPath: '/backorders'
+      preLoaderRoute: typeof BackordersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sales-orders': {
+      id: '/sales-orders'
+      path: '/sales-orders'
+      fullPath: '/sales-orders'
+      preLoaderRoute: typeof SalesOrdersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/wave-planning': {
+      id: '/wave-planning'
+      path: '/wave-planning'
+      fullPath: '/wave-planning'
+      preLoaderRoute: typeof WavePlanningRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AllocationRoute: AllocationRoute,
+  BackordersRoute: BackordersRoute,
+  SalesOrdersRoute: SalesOrdersRoute,
+  WavePlanningRoute: WavePlanningRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
