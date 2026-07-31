@@ -14,6 +14,7 @@ import { Route as AllocationRouteImport } from './routes/allocation'
 import { Route as BackordersRouteImport } from './routes/backorders'
 import { Route as SalesOrdersRouteImport } from './routes/sales-orders'
 import { Route as WavePlanningRouteImport } from './routes/wave-planning'
+import { Route as WaveReleaseRouteImport } from './routes/wave-release'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -40,6 +41,11 @@ const WavePlanningRoute = WavePlanningRouteImport.update({
   path: '/wave-planning',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WaveReleaseRoute = WaveReleaseRouteImport.update({
+  id: '/wave-release',
+  path: '/wave-release',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -47,6 +53,7 @@ export interface FileRoutesByFullPath {
   '/backorders': typeof BackordersRoute
   '/sales-orders': typeof SalesOrdersRoute
   '/wave-planning': typeof WavePlanningRoute
+  '/wave-release': typeof WaveReleaseRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -54,6 +61,7 @@ export interface FileRoutesByTo {
   '/backorders': typeof BackordersRoute
   '/sales-orders': typeof SalesOrdersRoute
   '/wave-planning': typeof WavePlanningRoute
+  '/wave-release': typeof WaveReleaseRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -62,13 +70,25 @@ export interface FileRoutesById {
   '/backorders': typeof BackordersRoute
   '/sales-orders': typeof SalesOrdersRoute
   '/wave-planning': typeof WavePlanningRoute
+  '/wave-release': typeof WaveReleaseRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/allocation' | '/backorders' | '/sales-orders' | '/wave-planning'
+    | '/'
+    | '/allocation'
+    | '/backorders'
+    | '/sales-orders'
+    | '/wave-planning'
+    | '/wave-release'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/allocation' | '/backorders' | '/sales-orders' | '/wave-planning'
+  to:
+    | '/'
+    | '/allocation'
+    | '/backorders'
+    | '/sales-orders'
+    | '/wave-planning'
+    | '/wave-release'
   id:
     | '__root__'
     | '/'
@@ -76,6 +96,7 @@ export interface FileRouteTypes {
     | '/backorders'
     | '/sales-orders'
     | '/wave-planning'
+    | '/wave-release'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -84,6 +105,7 @@ export interface RootRouteChildren {
   BackordersRoute: typeof BackordersRoute
   SalesOrdersRoute: typeof SalesOrdersRoute
   WavePlanningRoute: typeof WavePlanningRoute
+  WaveReleaseRoute: typeof WaveReleaseRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -123,6 +145,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WavePlanningRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/wave-release': {
+      id: '/wave-release'
+      path: '/wave-release'
+      fullPath: '/wave-release'
+      preLoaderRoute: typeof WaveReleaseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -132,6 +161,7 @@ const rootRouteChildren: RootRouteChildren = {
   BackordersRoute: BackordersRoute,
   SalesOrdersRoute: SalesOrdersRoute,
   WavePlanningRoute: WavePlanningRoute,
+  WaveReleaseRoute: WaveReleaseRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
