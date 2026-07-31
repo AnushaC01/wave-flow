@@ -101,7 +101,7 @@ function ShippingLabelsPage() {
               <div className="py-3">
                 <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Ship To</p>
                 <p className="text-sm font-medium">{order?.customer ?? "—"}</p>
-                <p className="text-xs text-muted-foreground">{order?.shipTo ?? shipment?.destination ?? "—"}</p>
+                <p className="text-xs text-muted-foreground">{shipment?.destination ?? "Address on file"}</p>
               </div>
               <div className="grid grid-cols-2 gap-2 border-t border-border pt-3 text-xs">
                 <LabelField k="Order" v={selected.order} />
