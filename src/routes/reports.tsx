@@ -53,8 +53,8 @@ function ReportsPage() {
     { key: "warehouse", header: "Warehouse", value: (r) => r.warehouse },
     { key: "orders", header: "Orders", value: (r) => r.orders.length, className: "num text-right" },
     { key: "lines", header: "Lines", value: (r) => r.lines, className: "num text-right" },
-    { key: "units", header: "Units", value: (r) => r.units, className: "num text-right" },
-    { key: "progress", header: "Completion %", value: (r) => r.progress, className: "num text-right", render: (r) => `${r.progress}%` },
+    { key: "capacity", header: "Capacity", value: (r) => r.capacity, className: "num text-right" },
+    { key: "route", header: "Route", value: (r) => r.route },
     { key: "status", header: "Status", value: (r) => r.status, render: (r) => <StatusBadge value={r.status} /> },
   ];
 
