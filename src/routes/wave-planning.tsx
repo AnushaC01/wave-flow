@@ -226,7 +226,7 @@ function WavePlanningPage() {
   );
 }
 
-function Detail({ label, value }: { label: string; value?: string }) {
+function Detail({ label, value }: { label: string; value?: string | undefined }) {
   return (
     <div className="min-w-0">
       <dt className="text-xs text-muted-foreground">{label}</dt>
