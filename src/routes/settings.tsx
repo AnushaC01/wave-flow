@@ -165,7 +165,7 @@ function Picker({ options, placeholder }: { options: string[]; placeholder: stri
   );
 }
 
-function Toggle({ label, hint, defaultChecked }: { label: string; hint?: string; defaultChecked?: boolean }) {
+function Toggle({ label, hint, defaultChecked = false }: { label: string; hint?: string; defaultChecked?: boolean }) {
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 py-2">
       <div className="min-w-0">
