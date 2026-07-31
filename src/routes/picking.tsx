@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { CheckCircle2, Pause, Play, ScanBarcode, Square } from "lucide-react";
+import { CheckCircle2, Pause, Play, ScanBarcode } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -201,7 +201,6 @@ function PickingPage() {
           { key: "zone", label: "Zone", options: zones, match: (r, v) => r.zone === v },
           { key: "status", label: "Status", options: ["Pending", "In Progress", "Picked", "Short"], match: (r, v) => r.status === v },
         ]}
-        toolbar={<Square className="hidden h-0 w-0" />}
       />
     </div>
   );
