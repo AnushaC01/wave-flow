@@ -19,6 +19,7 @@ import { Route as PackingRouteImport } from './routes/packing'
 import { Route as PickListsRouteImport } from './routes/pick-lists'
 import { Route as PickingRouteImport } from './routes/picking'
 import { Route as SalesOrdersRouteImport } from './routes/sales-orders'
+import { Route as ShippingRouteImport } from './routes/shipping'
 import { Route as ShippingLabelsRouteImport } from './routes/shipping-labels'
 import { Route as StagingRouteImport } from './routes/staging'
 import { Route as WavePlanningRouteImport } from './routes/wave-planning'
@@ -74,6 +75,11 @@ const SalesOrdersRoute = SalesOrdersRouteImport.update({
   path: '/sales-orders',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ShippingRoute = ShippingRouteImport.update({
+  id: '/shipping',
+  path: '/shipping',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ShippingLabelsRoute = ShippingLabelsRouteImport.update({
   id: '/shipping-labels',
   path: '/shipping-labels',
@@ -106,6 +112,7 @@ export interface FileRoutesByFullPath {
   '/pick-lists': typeof PickListsRoute
   '/picking': typeof PickingRoute
   '/sales-orders': typeof SalesOrdersRoute
+  '/shipping': typeof ShippingRoute
   '/shipping-labels': typeof ShippingLabelsRoute
   '/staging': typeof StagingRoute
   '/wave-planning': typeof WavePlanningRoute
@@ -122,6 +129,7 @@ export interface FileRoutesByTo {
   '/pick-lists': typeof PickListsRoute
   '/picking': typeof PickingRoute
   '/sales-orders': typeof SalesOrdersRoute
+  '/shipping': typeof ShippingRoute
   '/shipping-labels': typeof ShippingLabelsRoute
   '/staging': typeof StagingRoute
   '/wave-planning': typeof WavePlanningRoute
@@ -139,6 +147,7 @@ export interface FileRoutesById {
   '/pick-lists': typeof PickListsRoute
   '/picking': typeof PickingRoute
   '/sales-orders': typeof SalesOrdersRoute
+  '/shipping': typeof ShippingRoute
   '/shipping-labels': typeof ShippingLabelsRoute
   '/staging': typeof StagingRoute
   '/wave-planning': typeof WavePlanningRoute
@@ -157,6 +166,7 @@ export interface FileRouteTypes {
     | '/pick-lists'
     | '/picking'
     | '/sales-orders'
+    | '/shipping'
     | '/shipping-labels'
     | '/staging'
     | '/wave-planning'
@@ -173,6 +183,7 @@ export interface FileRouteTypes {
     | '/pick-lists'
     | '/picking'
     | '/sales-orders'
+    | '/shipping'
     | '/shipping-labels'
     | '/staging'
     | '/wave-planning'
@@ -189,6 +200,7 @@ export interface FileRouteTypes {
     | '/pick-lists'
     | '/picking'
     | '/sales-orders'
+    | '/shipping'
     | '/shipping-labels'
     | '/staging'
     | '/wave-planning'
@@ -206,6 +218,7 @@ export interface RootRouteChildren {
   PickListsRoute: typeof PickListsRoute
   PickingRoute: typeof PickingRoute
   SalesOrdersRoute: typeof SalesOrdersRoute
+  ShippingRoute: typeof ShippingRoute
   ShippingLabelsRoute: typeof ShippingLabelsRoute
   StagingRoute: typeof StagingRoute
   WavePlanningRoute: typeof WavePlanningRoute
@@ -284,6 +297,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SalesOrdersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/shipping': {
+      id: '/shipping'
+      path: '/shipping'
+      fullPath: '/shipping'
+      preLoaderRoute: typeof ShippingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/shipping-labels': {
       id: '/shipping-labels'
       path: '/shipping-labels'
@@ -326,6 +346,7 @@ const rootRouteChildren: RootRouteChildren = {
   PickListsRoute: PickListsRoute,
   PickingRoute: PickingRoute,
   SalesOrdersRoute: SalesOrdersRoute,
+  ShippingRoute: ShippingRoute,
   ShippingLabelsRoute: ShippingLabelsRoute,
   StagingRoute: StagingRoute,
   WavePlanningRoute: WavePlanningRoute,
