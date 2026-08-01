@@ -27,6 +27,11 @@ import {
 
 /* --------------------------------- client --------------------------------- */
 
+/** Untyped client for dynamic (runtime-chosen) table names. */
+export function rawDb(): SupabaseClient {
+  return db() as unknown as SupabaseClient;
+}
+
 export function db(): SupabaseClient<Database> {
   const url = process.env["SUPABASE_URL"];
   const key = process.env["SUPABASE_PUBLISHABLE_KEY"] ?? process.env["SUPABASE_ANON_KEY"];
@@ -85,7 +90,7 @@ async function listRows<Row>(cfg: EntityConfig, params: ListParams): Promise<Lis
   const sortKey = params.sort && cfg.sortable.includes(params.sort) ? params.sort : cfg.defaultSort;
   const dir = params.dir ?? cfg.defaultDir;
 
-  let q = db().from(cfg.table).select(cfg.select, { count: "exact" });
+  let q = rawDb().from(cfg.table).select(cfg.select, { count: "exact" });
 
   if (params.search && cfg.search.length) {
     const term = params.search.replace(/[%,()]/g, " ").trim();
@@ -408,7 +413,7 @@ export async function notify(title: string, message: string, severity: Notificat
 /* ------------------------------ id generation ----------------------------- */
 
 export async function nextId(table: string, column: string, prefix: string, pad: number): Promise<string> {
-  const { data, error } = await db().from(table).select(column).ilike(column, `${prefix}%`).order(column, { ascending: false }).limit(1);
+  const { data, error } = await rawDb().from(table).select(column).ilike(column, `${prefix}%`).order(column, { ascending: false }).limit(1);
   if (error) fail(error);
   const last = (data?.[0] as Record<string, string> | undefined)?.[column];
   const n = last ? Number(last.slice(prefix.length).replace(/\D/g, "")) + 1 : 1;
