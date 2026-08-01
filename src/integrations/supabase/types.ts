@@ -842,7 +842,53 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      allocate_order: { Args: { p_id: string }; Returns: Json }
+      authorize_dispatch: {
+        Args: {
+          p_actor: string
+          p_approve: boolean
+          p_id: string
+          p_role: string
+        }
+        Returns: string
+      }
+      confirm_pick: {
+        Args: {
+          p_barcode: string
+          p_id: string
+          p_picker: string
+          p_qty: number
+        }
+        Returns: Json
+      }
+      confirm_wave_reservation: { Args: { p_id: string }; Returns: boolean }
+      create_sales_order: { Args: { p: Json }; Returns: string }
+      create_shipment: { Args: { p: Json }; Returns: string }
+      create_wave: { Args: { p: Json }; Returns: string }
+      generate_pick_lists: { Args: { p_wave: string }; Returns: number }
+      next_code: {
+        Args: {
+          p_column: string
+          p_pad: number
+          p_prefix: string
+          p_table: string
+        }
+        Returns: string
+      }
+      release_wave: { Args: { p_id: string }; Returns: string }
+      reserve_order: { Args: { p_id: string }; Returns: string }
+      resolve_backorder: {
+        Args: { p_action: string; p_id: string }
+        Returns: Json
+      }
+      update_sales_order: { Args: { p: Json; p_id: string }; Returns: string }
+      update_shipment: { Args: { p: Json; p_id: string }; Returns: string }
+      update_wave: { Args: { p: Json; p_id: string }; Returns: string }
+      validate_sales_order: { Args: { p_id: string }; Returns: Json }
+      verify_load: {
+        Args: { p_actor: string; p_checklist: Json; p_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
