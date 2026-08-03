@@ -64,7 +64,7 @@ function ShippingLabelsPage() {
   const shipment = current ? shipments.find((s) => s.orders.includes(current.order)) : undefined;
 
   const updateFn = useServerFn(updateShipmentFn);
-  const generateLabel = useWmsMutation((args: Parameters<typeof updateFn>[0]["data"]) => updateFn({ data: args }), {
+  const generateLabel = useWmsMutation((args: { id: string; data: Record<string, unknown> }) => updateFn({ data: args as never }), {
     success: () => ({ title: "Label regenerated" }),
   });
 
