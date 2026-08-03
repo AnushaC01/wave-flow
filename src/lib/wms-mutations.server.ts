@@ -114,11 +114,11 @@ export const confirmPick = (id: string, barcode: string, qty: number, picker: st
   rpc<{ status: string; pickedQty: number }>("confirm_pick", { p_id: id, p_barcode: barcode, p_qty: qty, p_picker: picker });
 
 export async function updatePickLine(id: string, input: Partial<PickLineInput>) {
-  const patch: Record<string, unknown> = {};
-  if (input.picker !== undefined) patch["picker"] = input.picker;
-  if (input.status !== undefined) patch["status"] = input.status;
-  if (input.pickedQty !== undefined) patch["picked_qty"] = input.pickedQty;
-  if (input.verified !== undefined) patch["verified"] = input.verified;
+  const patch: { picker?: string; status?: string; picked_qty?: number; verified?: boolean } = {};
+  if (input.picker !== undefined) patch.picker = input.picker;
+  if (input.status !== undefined) patch.status = input.status;
+  if (input.pickedQty !== undefined) patch.picked_qty = input.pickedQty;
+  if (input.verified !== undefined) patch.verified = input.verified;
   const { error } = await db().from("pick_lines").update(patch).eq("id", id);
   if (error) fail(error);
   await logActivity("System", "updated pick line", id, "pick");
