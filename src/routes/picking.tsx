@@ -60,7 +60,8 @@ function PickingPage() {
     { success: (_r, args) => ({ title: "Item verified & picked", description: `Pick line ${args.id} confirmed.` }) },
   );
   const updatePickLineMutation = useWmsMutation(
-    (args: { id: string; data: Parameters<typeof updatePickLineServerFn>[0]["data"]["data"] }) => updatePickLineServerFn({ data: args }),
+    (args: { id: string; data: { picker?: string; status?: PickLine["status"]; pickedQty?: number; verified?: boolean } }) =>
+      updatePickLineServerFn({ data: args }),
     { success: () => ({ title: "Pick line updated" }) },
   );
   const completePickingMutation = useWmsMutation((args: { wave: string }) => completeWavePickingServerFn({ data: args }), {

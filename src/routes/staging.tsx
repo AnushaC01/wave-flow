@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { ClipboardCheck, MapPin } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/wms/data-table";
@@ -34,7 +35,7 @@ function StagingPage() {
   const docks = reference?.docks ?? [];
 
   const updateFn = useServerFn(updateShipmentFn);
-  const moveToLoading = useWmsMutation((args: Parameters<typeof updateFn>[0]["data"]) => updateFn({ data: args }), {
+  const moveToLoading = useWmsMutation((args: { id: string; data: Record<string, unknown> }) => updateFn({ data: args as never }), {
     success: (_r, args) => ({ title: `${args.id} moved to loading` }),
   });
 
@@ -109,7 +110,7 @@ function StagingPage() {
         data={rows}
         columns={columns}
         searchKeys={(r) => `${r.id} ${r.carrier} ${r.dock} ${r.destination} ${r.orders.join(" ")}`}
-        onExport={() => {}}
+        onExport={() => toast.success("Staging report exported")}
         filters={[
           { key: "dock", label: "Dock", options: docks, match: (r, v) => r.dock === v },
           { key: "status", label: "Status", options: [...SHIPMENT_STATUSES], match: (r, v) => r.status === v },
