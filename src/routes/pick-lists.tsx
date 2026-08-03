@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, FileText, Printer, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -10,7 +11,7 @@ import { PageHeader } from "@/components/wms/page-header";
 import { StatCard } from "@/components/wms/stat-card";
 import { StatusBadge } from "@/components/wms/status-badge";
 import { useRole } from "@/context/role-context";
-import { errorMessage, pickLinesQuery, referenceQuery, useWmsMutation, wavesQuery } from "@/lib/wms-queries";
+import { errorMessage, pickLinesQuery, referenceQuery, WORKFLOW_KEYS, wavesQuery } from "@/lib/wms-queries";
 import { generatePickListsFn } from "@/lib/wms.functions";
 import type { PickLine } from "@/lib/wms-types";
 
@@ -60,7 +61,8 @@ function PickListsPage() {
   const releasedWaves = waves.filter((w) => ["Released", "Picking", "Completed"].includes(w.status));
 
   const generateServerFn = useServerFn(generatePickListsFn);
-  const generateMutation = useWmsMutation((args: { wave: string }) => generateServerFn({ data: args }));
+  const queryClient = useQueryClient();
+  const [generating, setGenerating] = useState(false);
 
   const generate = async () => {
     const targets = waves.filter((w) => w.status === "Released");
@@ -68,15 +70,16 @@ function PickListsPage() {
       toast.info("No released waves", { description: "Release a wave before generating pick lists." });
       return;
     }
+    setGenerating(true);
     try {
       const results = await Promise.all(targets.map((w) => generateServerFn({ data: { wave: w.id } })));
-      const total = results.reduce((s, r) => s + (typeof r === "number" ? r : 0), 0);
-      generateMutation.reset();
-      // Trigger the shared refresh path via the wrapped mutation helper.
-      await generateMutation.mutateAsync({ wave: targets[0].id }).catch(() => undefined);
+      const total = results.reduce((s: number, r) => s + (typeof r === "number" ? r : 0), 0);
+      for (const key of WORKFLOW_KEYS) void queryClient.invalidateQueries({ queryKey: [key] });
       toast.success("Pick lists generated", { description: `${total} pick lines across ${targets.length} released wave(s).` });
     } catch (err) {
       toast.error("Pick list generation failed", { description: errorMessage(err) });
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -114,7 +117,7 @@ function PickListsPage() {
               <Download className="h-4 w-4" />
               Download
             </Button>
-            <Button disabled={!can("picklist.generate") || generateMutation.isPending} onClick={generate}>
+            <Button disabled={!can("picklist.generate") || generating} onClick={generate}>
               <RefreshCw className="h-4 w-4" />
               Generate
             </Button>
