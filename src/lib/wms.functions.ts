@@ -105,7 +105,7 @@ export const createOrderFn = createServerFn({ method: "POST" })
 
 export const updateOrderFn = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ id: z.string().min(1), data: salesOrderInput.partial() }).parse(d))
-  .handler(({ data }) => updateOrder(data.id, data.data));
+  .handler(({ data }) => updateOrder(data.id, data.data as Record<string, unknown>));
 
 export const deleteOrderFn = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => idOnly.parse(d))
@@ -149,7 +149,7 @@ export const createWaveFn = createServerFn({ method: "POST" })
 
 export const updateWaveFn = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ id: z.string().min(1), data: waveInput.partial() }).parse(d))
-  .handler(({ data }) => updateWave(data.id, data.data));
+  .handler(({ data }) => updateWave(data.id, data.data as Record<string, unknown>));
 
 export const deleteWaveFn = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => idOnly.parse(d))
@@ -183,7 +183,19 @@ export const confirmPickFn = createServerFn({ method: "POST" })
   .handler(({ data }) => confirmPick(data.id, data.barcode, data.qty, data.picker));
 
 export const updatePickLineFn = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ id: z.string().min(1), data: pickLineInput.partial() }).parse(d))
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        id: z.string().min(1),
+        data: z.object({
+          picker: z.string().trim().max(80).optional(),
+          status: pickLineInput.shape.status.optional(),
+          pickedQty: z.number().int().min(0).max(1_000_000).optional(),
+          verified: z.boolean().optional(),
+        }),
+      })
+      .parse(d),
+  )
   .handler(({ data }) => updatePickLine(data.id, data.data));
 
 export const completeWavePickingFn = createServerFn({ method: "POST" })
@@ -208,7 +220,7 @@ export const createShipmentFn = createServerFn({ method: "POST" })
 
 export const updateShipmentFn = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ id: z.string().min(1), data: shipmentInput.partial() }).parse(d))
-  .handler(({ data }) => updateShipment(data.id, data.data));
+  .handler(({ data }) => updateShipment(data.id, data.data as Record<string, unknown>));
 
 export const deleteShipmentFn = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => idOnly.parse(d))

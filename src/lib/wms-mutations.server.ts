@@ -3,14 +3,7 @@
  * All multi-table business rules run inside Postgres functions (transactions).
  */
 import { db, fail, HttpError, logActivity, rawDb } from "./wms.server";
-import type {
-  BackorderInput,
-  PackingInput,
-  PickLineInput,
-  SalesOrderInput,
-  ShipmentInput,
-  WaveInput,
-} from "./wms-types";
+import type { BackorderInput, PackingInput, PickLineInput, SalesOrderInput, WaveInput } from "./wms-types";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 async function rpc<T>(name: string, args: Record<string, unknown>): Promise<T> {
@@ -23,7 +16,7 @@ async function rpc<T>(name: string, args: Record<string, unknown>): Promise<T> {
 
 export const createOrder = (input: SalesOrderInput) => rpc<string>("create_sales_order", { p: input });
 
-export const updateOrder = (id: string, input: Partial<SalesOrderInput>) =>
+export const updateOrder = (id: string, input: Record<string, unknown>) =>
   rpc<string>("update_sales_order", { p_id: id, p: input });
 
 export async function deleteOrder(id: string) {
@@ -84,7 +77,7 @@ export async function inventoryAction(ids: string[], kind: "reserve" | "release"
 /* ---------------------------------- waves --------------------------------- */
 
 export const createWave = (input: WaveInput) => rpc<string>("create_wave", { p: input });
-export const updateWave = (id: string, input: Partial<WaveInput>) => rpc<string>("update_wave", { p_id: id, p: input });
+export const updateWave = (id: string, input: Record<string, unknown>) => rpc<string>("update_wave", { p_id: id, p: input });
 export const releaseWave = (id: string) => rpc<string>("release_wave", { p_id: id });
 export const confirmWaveReservation = (id: string) => rpc<boolean>("confirm_wave_reservation", { p_id: id });
 export const generatePickLists = (wave: string) => rpc<number>("generate_pick_lists", { p_wave: wave });
@@ -113,7 +106,14 @@ export async function deleteWave(id: string) {
 export const confirmPick = (id: string, barcode: string, qty: number, picker: string) =>
   rpc<{ status: string; pickedQty: number }>("confirm_pick", { p_id: id, p_barcode: barcode, p_qty: qty, p_picker: picker });
 
-export async function updatePickLine(id: string, input: Partial<PickLineInput>) {
+export interface PickLinePatch {
+  picker?: string | undefined;
+  status?: PickLineInput["status"] | undefined;
+  pickedQty?: number | undefined;
+  verified?: boolean | undefined;
+}
+
+export async function updatePickLine(id: string, input: PickLinePatch) {
   const patch: { picker?: string; status?: string; picked_qty?: number; verified?: boolean } = {};
   if (input.picker !== undefined) patch.picker = input.picker;
   if (input.status !== undefined) patch.status = input.status;
@@ -145,7 +145,7 @@ export async function completeWavePicking(waveId: string) {
 
 /* --------------------------------- packing -------------------------------- */
 
-export async function upsertPacking(input: PackingInput & { id?: string }) {
+export async function upsertPacking(input: PackingInput) {
   const client = db();
   const row = {
     order_id: input.order,
@@ -186,7 +186,8 @@ export async function deletePacking(id: string) {
 /* -------------------------------- shipments ------------------------------- */
 
 export const createShipment = (input: ShipmentInput) => rpc<string>("create_shipment", { p: input });
-export const updateShipment = (id: string, input: Partial<ShipmentInput>) => rpc<string>("update_shipment", { p_id: id, p: input });
+export const updateShipment = (id: string, input: Record<string, unknown>) =>
+  rpc<string>("update_shipment", { p_id: id, p: input });
 export const verifyLoad = (id: string, checklist: string[], actor: string) =>
   rpc<boolean>("verify_load", { p_id: id, p_checklist: checklist, p_actor: actor });
 export const authorizeDispatch = (id: string, approve: boolean, role: string, actor: string) =>
@@ -243,10 +244,12 @@ export async function markNotificationsRead() {
 
 /* -------------------------------- settings -------------------------------- */
 
-export async function getSettings(): Promise<Record<string, unknown>> {
+export async function getSettings(): Promise<Record<string, string | number | boolean | null>> {
   const { data, error } = await db().from("app_settings").select("*");
   if (error) fail(error);
-  return Object.fromEntries((data ?? []).map((r) => [r.key, r.value]));
+  return Object.fromEntries(
+    (data ?? []).map((r) => [r.key, r.value as string | number | boolean | null]),
+  );
 }
 
 export async function setSetting(key: string, value: unknown) {
