@@ -60,7 +60,7 @@ function PackingPage() {
   });
 
   const completeMutation = useWmsMutation((args: Record<string, unknown>) => saveFn({ data: args as never }), {
-    success: (_r, args) => ({ title: "Packing completed", description: `${args.order} ready for staging.` }),
+    success: (_r, args) => ({ title: "Packing completed", description: `${args['order']} ready for staging.` }),
   });
 
   const set = (k: keyof typeof emptyForm, v: string) => setForm((s) => ({ ...s, [k]: v }));
