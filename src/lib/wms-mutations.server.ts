@@ -3,7 +3,7 @@
  * All multi-table business rules run inside Postgres functions (transactions).
  */
 import { db, fail, HttpError, logActivity, rawDb } from "./wms.server";
-import type { BackorderInput, PackingInput, PickLineInput, SalesOrderInput, WaveInput } from "./wms-types";
+import type { BackorderInput, PackingInput, PickLineInput, SalesOrderInput, ShipmentInput, WaveInput } from "./wms-types";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 async function rpc<T>(name: string, args: Record<string, unknown>): Promise<T> {
