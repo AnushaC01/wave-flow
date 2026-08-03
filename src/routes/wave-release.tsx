@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, Rocket, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -9,7 +11,9 @@ import { PageHeader } from "@/components/wms/page-header";
 import { StatCard } from "@/components/wms/stat-card";
 import { StatusBadge } from "@/components/wms/status-badge";
 import { useRole } from "@/context/role-context";
-import { carriers, warehouses, waves, type Wave } from "@/data/mock-data";
+import { errorMessage, referenceQuery, useWmsMutation, wavesQuery } from "@/lib/wms-queries";
+import { confirmWaveReservationFn, releaseWaveFn } from "@/lib/wms.functions";
+import type { Wave } from "@/lib/wms-types";
 
 export const Route = createFileRoute("/wave-release")({
   head: () => ({
@@ -25,17 +29,48 @@ export const Route = createFileRoute("/wave-release")({
 
 function WaveReleasePage() {
   const { can } = useRole();
-  const [rows, setRows] = useState<Wave[]>(waves);
+  const { data: wavesResult, isLoading } = useQuery(wavesQuery());
+  const { data: reference } = useQuery(referenceQuery());
+  const rows: Wave[] = wavesResult?.rows ?? [];
+  const warehouses = reference?.warehouses ?? [];
+  const carriers = reference?.carriers ?? [];
   const blocked = rows.filter((w) => w.status === "Planned" && !w.reservationConfirmed);
 
+  const [rechecking, setRechecking] = useState(false);
+
+  const releaseServerFn = useServerFn(releaseWaveFn);
+  const confirmReservationServerFn = useServerFn(confirmWaveReservationFn);
+
+  const releaseMutation = useWmsMutation((args: { id: string }) => releaseServerFn({ data: args }), {
+    success: (_r, args) => ({ title: `${args.id} released`, description: "Pick lists can now be generated." }),
+  });
+  const confirmReservationMutation = useWmsMutation((args: { id: string }) => confirmReservationServerFn({ data: args }));
+
   const release = (w: Wave) => {
-    if (!w.reservationConfirmed) {
-      toast.error("Release blocked", { description: `${w.id} has no confirmed inventory reservation (validation rule).` });
+    releaseMutation.mutate(
+      { id: w.id },
+      {
+        onError: (err) => toast.error("Release blocked", { description: errorMessage(err) }),
+      },
+    );
+  };
+
+  const recheckReservations = async () => {
+    const candidates = rows.filter((w) => w.status === "Planned" || w.status === "Draft");
+    if (candidates.length === 0) {
+      toast.info("No waves to re-check");
       return;
     }
-    // TODO(integration): call the Wave Release API and trigger pick list generation.
-    setRows((s) => s.map((r) => (r.id === w.id ? { ...r, status: "Released" } : r)));
-    toast.success(`${w.id} released`, { description: "Pick lists can now be generated." });
+    setRechecking(true);
+    try {
+      await Promise.all(candidates.map((w) => confirmReservationServerFn({ data: { id: w.id } })));
+      toast.success("Reservation re-check complete", { description: `${candidates.length} wave(s) checked.` });
+      confirmReservationMutation.reset();
+    } catch (err) {
+      toast.error("Reservation re-check failed", { description: errorMessage(err) });
+    } finally {
+      setRechecking(false);
+    }
   };
 
   const columns: Column<Wave>[] = [
@@ -60,7 +95,7 @@ function WaveReleasePage() {
       render: (r) => (
         <Button
           size="sm"
-          disabled={!can("wave.release") || !["Planned", "Draft"].includes(r.status)}
+          disabled={!can("wave.release") || !["Planned", "Draft"].includes(r.status) || releaseMutation.isPending}
           onClick={() => release(r)}
         >
           <Rocket className="h-4 w-4" />
@@ -77,11 +112,7 @@ function WaveReleasePage() {
         description="Validation rule · A wave cannot be released without confirmed inventory reservation."
         breadcrumbs={[{ label: "Wave Management" }, { label: "Wave Release" }]}
         actions={
-          <Button
-            variant="outline"
-            disabled={!can("wave.release")}
-            onClick={() => toast.info("Reservation re-check requested", { description: "TODO: Inventory API reservation validation." })}
-          >
+          <Button variant="outline" disabled={!can("wave.release") || rechecking} onClick={recheckReservations}>
             <ShieldCheck className="h-4 w-4" />
             Re-check Reservations
           </Button>
@@ -108,6 +139,7 @@ function WaveReleasePage() {
       <DataTable
         data={rows}
         columns={columns}
+        loading={isLoading}
         searchKeys={(r) => `${r.id} ${r.name} ${r.warehouse} ${r.carrier}`}
         filters={[
           { key: "warehouse", label: "Warehouse", options: warehouses.map((w) => w.code), match: (r, v) => r.warehouse === v },

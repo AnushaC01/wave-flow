@@ -1,5 +1,6 @@
-import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { Download, FileText, Printer, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -9,7 +10,9 @@ import { PageHeader } from "@/components/wms/page-header";
 import { StatCard } from "@/components/wms/stat-card";
 import { StatusBadge } from "@/components/wms/status-badge";
 import { useRole } from "@/context/role-context";
-import { pickLines, waves, zones, type PickLine } from "@/data/mock-data";
+import { errorMessage, pickLinesQuery, referenceQuery, useWmsMutation, wavesQuery } from "@/lib/wms-queries";
+import { generatePickListsFn } from "@/lib/wms.functions";
+import type { PickLine } from "@/lib/wms-types";
 
 export const Route = createFileRoute("/pick-lists")({
   head: () => ({
@@ -23,18 +26,58 @@ export const Route = createFileRoute("/pick-lists")({
   component: PickListsPage,
 });
 
+function toCsv(rows: PickLine[]): string {
+  const headers = ["Pick Line", "Wave", "Picker", "Zone", "Location", "SKU", "Product", "Qty", "Barcode", "Serial", "Status"];
+  const lines = rows.map((r) =>
+    [r.id, r.wave, r.picker, r.zone, r.location, r.sku, r.product, r.quantity, r.barcode, r.serial, r.status]
+      .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`)
+      .join(","),
+  );
+  return [headers.join(","), ...lines].join("\n");
+}
+
+function downloadCsv(rows: PickLine[]) {
+  const csv = toCsv(rows);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "pick-lists.csv";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 function PickListsPage() {
   const { can } = useRole();
-  const [loading, setLoading] = useState(false);
+  const { data: pickLinesResult, isLoading } = useQuery(pickLinesQuery());
+  const { data: wavesResult } = useQuery(wavesQuery());
+  const { data: reference } = useQuery(referenceQuery());
+  const pickLines: PickLine[] = pickLinesResult?.rows ?? [];
+  const waves = wavesResult?.rows ?? [];
+  const zones = reference?.zones ?? [];
   const releasedWaves = waves.filter((w) => ["Released", "Picking", "Completed"].includes(w.status));
 
-  const generate = () => {
-    // TODO(integration): call Pick List Generation service for the selected wave.
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      toast.success("Pick lists generated", { description: `${pickLines.length} pick lines across ${releasedWaves.length} released waves.` });
-    }, 900);
+  const generateServerFn = useServerFn(generatePickListsFn);
+  const generateMutation = useWmsMutation((args: { wave: string }) => generateServerFn({ data: args }));
+
+  const generate = async () => {
+    const targets = waves.filter((w) => w.status === "Released");
+    if (targets.length === 0) {
+      toast.info("No released waves", { description: "Release a wave before generating pick lists." });
+      return;
+    }
+    try {
+      const results = await Promise.all(targets.map((w) => generateServerFn({ data: { wave: w.id } })));
+      const total = results.reduce((s, r) => s + (typeof r === "number" ? r : 0), 0);
+      generateMutation.reset();
+      // Trigger the shared refresh path via the wrapped mutation helper.
+      await generateMutation.mutateAsync({ wave: targets[0].id }).catch(() => undefined);
+      toast.success("Pick lists generated", { description: `${total} pick lines across ${targets.length} released wave(s).` });
+    } catch (err) {
+      toast.error("Pick list generation failed", { description: errorMessage(err) });
+    }
   };
 
   const columns: Column<PickLine>[] = [
@@ -67,11 +110,11 @@ function PickListsPage() {
               <FileText className="h-4 w-4" />
               Export PDF
             </Button>
-            <Button variant="outline" onClick={() => toast.success("Download started")}>
+            <Button variant="outline" onClick={() => downloadCsv(pickLines)}>
               <Download className="h-4 w-4" />
               Download
             </Button>
-            <Button disabled={!can("picklist.generate")} onClick={generate}>
+            <Button disabled={!can("picklist.generate") || generateMutation.isPending} onClick={generate}>
               <RefreshCw className="h-4 w-4" />
               Generate
             </Button>
@@ -82,7 +125,7 @@ function PickListsPage() {
       <Alert className="mb-4 border-info/20 bg-info-soft">
         <AlertTitle>Released waves eligible for pick list generation</AlertTitle>
         <AlertDescription className="text-muted-foreground">
-          {releasedWaves.map((w) => `${w.id} (${w.name})`).join(" · ")}
+          {releasedWaves.length > 0 ? releasedWaves.map((w) => `${w.id} (${w.name})`).join(" · ") : "No released waves yet."}
         </AlertDescription>
       </Alert>
 
@@ -96,10 +139,13 @@ function PickListsPage() {
       <DataTable
         data={pickLines}
         columns={columns}
-        loading={loading}
+        loading={isLoading}
         pageSize={10}
         searchKeys={(r) => `${r.id} ${r.wave} ${r.picker} ${r.sku} ${r.product} ${r.barcode}`}
-        onExport={() => toast.success("CSV export queued")}
+        onExport={() => {
+          downloadCsv(pickLines);
+          toast.success("CSV export queued");
+        }}
         filters={[
           { key: "wave", label: "Wave", options: releasedWaves.map((w) => w.id), match: (r, v) => r.wave === v },
           { key: "zone", label: "Zone", options: zones, match: (r, v) => r.zone === v },

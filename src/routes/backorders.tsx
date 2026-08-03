@@ -1,5 +1,6 @@
-import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { CheckCheck, PackagePlus, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -7,7 +8,9 @@ import { DataTable, type Column } from "@/components/wms/data-table";
 import { PageHeader } from "@/components/wms/page-header";
 import { StatCard } from "@/components/wms/stat-card";
 import { StatusBadge } from "@/components/wms/status-badge";
-import { backorders, customers, type Backorder } from "@/data/mock-data";
+import { resolveBackorderFn } from "@/lib/wms.functions";
+import { backordersQuery, referenceQuery, useWmsMutation } from "@/lib/wms-queries";
+import { PRIORITIES, type Backorder } from "@/lib/wms-types";
 
 export const Route = createFileRoute("/backorders")({
   head: () => ({
@@ -22,13 +25,22 @@ export const Route = createFileRoute("/backorders")({
 });
 
 function BackordersPage() {
-  const [rows, setRows] = useState<Backorder[]>(backorders);
+  const backordersQ = useQuery(backordersQuery());
+  const referenceQ = useQuery(referenceQuery());
+  const rows = backordersQ.data?.rows ?? [];
+  const customers = referenceQ.data?.customers ?? [];
 
-  const update = (id: string, status: Backorder["status"], message: string) => {
-    // TODO(integration): post allocation/fulfilment to the Inventory + Order APIs.
-    setRows((s) => s.map((r) => (r.id === id ? { ...r, status } : r)));
-    toast.success(message, { description: `${id} updated.` });
-  };
+  const resolveFn = useServerFn(resolveBackorderFn);
+  const resolveMutation = useWmsMutation(
+    (args: { id: string; action: "fulfil" | "allocate" | "close" }) => resolveFn({ data: args }),
+    {
+      success: (_r, args) => ({
+        title:
+          args.action === "fulfil" ? "Backorder fulfilled" : args.action === "allocate" ? "Inventory allocated" : "Backorder closed",
+        description: `${args.id} updated.`,
+      }),
+    },
+  );
 
   const columns: Column<Backorder>[] = [
     { key: "id", header: "Backorder", value: (r) => r.id, render: (r) => <span className="font-medium text-primary">{r.id}</span> },
@@ -49,15 +61,30 @@ function BackordersPage() {
       sortable: false,
       render: (r) => (
         <div className="flex items-center gap-1">
-          <Button size="sm" variant="outline" disabled={r.availableQty === 0} onClick={() => update(r.id, "Partially Allocated", "Inventory allocated")}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={r.availableQty === 0 || resolveMutation.isPending}
+            onClick={() => resolveMutation.mutate({ id: r.id, action: "allocate" })}
+          >
             <PackagePlus className="h-4 w-4" />
             Allocate
           </Button>
-          <Button size="sm" variant="outline" disabled={r.availableQty === 0} onClick={() => update(r.id, "Fulfilled", "Backorder fulfilled")}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={r.availableQty === 0 || resolveMutation.isPending}
+            onClick={() => resolveMutation.mutate({ id: r.id, action: "fulfil" })}
+          >
             <CheckCheck className="h-4 w-4" />
             Fulfil
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => update(r.id, "Closed", "Backorder closed")}>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={resolveMutation.isPending}
+            onClick={() => resolveMutation.mutate({ id: r.id, action: "close" })}
+          >
             <XCircle className="h-4 w-4" />
             Close
           </Button>
@@ -84,10 +111,11 @@ function BackordersPage() {
       <DataTable
         data={rows}
         columns={columns}
+        loading={backordersQ.isLoading}
         searchKeys={(r) => `${r.id} ${r.order} ${r.customer} ${r.sku} ${r.product}`}
         onExport={() => toast.success("Backorder report queued")}
         filters={[
-          { key: "priority", label: "Priority", options: ["Critical", "High", "Medium", "Low"], match: (r, v) => r.priority === v },
+          { key: "priority", label: "Priority", options: PRIORITIES, match: (r, v) => r.priority === v },
           { key: "status", label: "Status", options: ["Open", "Partially Allocated", "Fulfilled", "Closed"], match: (r, v) => r.status === v },
           { key: "customer", label: "Customer", options: customers.map((c) => c.name), match: (r, v) => r.customer === v },
         ]}

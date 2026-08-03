@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { CheckCircle2, FileText, Printer } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { CheckCircle2, FileText, Printer, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +14,9 @@ import { PageHeader } from "@/components/wms/page-header";
 import { StatCard } from "@/components/wms/stat-card";
 import { StatusBadge } from "@/components/wms/status-badge";
 import { useRole } from "@/context/role-context";
-import { packingRecords, type PackingRecord } from "@/data/mock-data";
+import { ordersQuery, packingQuery, wavesQuery, useWmsMutation, errorMessage } from "@/lib/wms-queries";
+import { savePackingFn, deletePackingFn } from "@/lib/wms.functions";
+import { PACKAGE_TYPES, packingInput, type PackingRecord } from "@/lib/wms-types";
 
 export const Route = createFileRoute("/packing")({
   head: () => ({
@@ -26,9 +30,63 @@ export const Route = createFileRoute("/packing")({
   component: PackingPage,
 });
 
+const emptyForm = {
+  order: "",
+  wave: "",
+  packageType: "Carton" as (typeof PACKAGE_TYPES)[number],
+  carton: "",
+  weightKg: "",
+  dimensions: "",
+  material: "",
+  labelNumber: `LBL-${Math.floor(90000 + Math.random() * 9000)}`,
+  station: "",
+  operator: "",
+};
+
 function PackingPage() {
   const { can } = useRole();
-  const [rows, setRows] = useState<PackingRecord[]>(packingRecords);
+  const { data: packingResult } = useQuery(packingQuery());
+  const { data: ordersResult } = useQuery(ordersQuery());
+  const { data: wavesResult } = useQuery(wavesQuery());
+  const rows: PackingRecord[] = packingResult?.rows ?? [];
+  const orders = ordersResult?.rows ?? [];
+  const waves = wavesResult?.rows ?? [];
+
+  const [form, setForm] = useState(emptyForm);
+
+  const saveFn = useServerFn(savePackingFn);
+  const saveMutation = useWmsMutation((args: Parameters<typeof saveFn>[0]["data"]) => saveFn({ data: args }), {
+    success: () => ({ title: "Package saved" }),
+  });
+
+  const completeMutation = useWmsMutation((args: Parameters<typeof saveFn>[0]["data"]) => saveFn({ data: args }), {
+    success: (_r, args) => ({ title: "Packing completed", description: `${args.order} ready for staging.` }),
+  });
+
+  const set = (k: keyof typeof emptyForm, v: string) => setForm((s) => ({ ...s, [k]: v }));
+
+  const submitNewPackage = () => {
+    const parsed = packingInput.safeParse({
+      order: form.order,
+      wave: form.wave || undefined,
+      packageType: form.packageType,
+      carton: form.carton,
+      weightKg: Number(form.weightKg || 0),
+      dimensions: form.dimensions,
+      material: form.material,
+      labelNumber: form.labelNumber,
+      station: form.station,
+      operator: form.operator,
+      status: "Pending",
+    });
+    if (!parsed.success) {
+      toast.error("Invalid package details", { description: parsed.error.issues[0]?.message });
+      return;
+    }
+    saveMutation.mutate(parsed.data, {
+      onSuccess: () => setForm({ ...emptyForm, labelNumber: `LBL-${Math.floor(90000 + Math.random() * 9000)}` }),
+    });
+  };
 
   const columns: Column<PackingRecord>[] = [
     { key: "id", header: "Packing ID", value: (r) => r.id, render: (r) => <span className="font-medium text-primary">{r.id}</span> },
@@ -50,11 +108,23 @@ function PackingPage() {
         <Button
           size="sm"
           variant="outline"
-          disabled={r.status === "Completed" || !can("pack.execute")}
-          onClick={() => {
-            setRows((s) => s.map((x) => (x.id === r.id ? { ...x, status: "Completed" } : x)));
-            toast.success("Packing completed", { description: `${r.order} ready for staging.` });
-          }}
+          disabled={r.status === "Completed" || !can("pack.execute") || completeMutation.isPending}
+          onClick={() =>
+            completeMutation.mutate({
+              id: r.id,
+              order: r.order,
+              wave: r.wave || undefined,
+              packageType: r.packageType,
+              carton: r.carton,
+              weightKg: r.weightKg,
+              dimensions: r.dimensions,
+              material: r.material,
+              labelNumber: r.labelNumber,
+              station: r.station,
+              operator: r.operator,
+              status: "Completed",
+            })
+          }
         >
           <CheckCircle2 className="h-4 w-4" />
           Complete
@@ -96,13 +166,41 @@ function PackingPage() {
             <CardTitle className="text-sm">New Package</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-3">
+            <Field label="Sales Order">
+              <Select value={form.order} onValueChange={(v) => set("order", v)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select order" />
+                </SelectTrigger>
+                <SelectContent>
+                  {orders.map((o) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.id}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Wave">
+              <Select value={form.wave} onValueChange={(v) => set("wave", v)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select wave" />
+                </SelectTrigger>
+                <SelectContent>
+                  {waves.map((w) => (
+                    <SelectItem key={w.id} value={w.id}>
+                      {w.id}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
             <Field label="Package Type">
-              <Select>
+              <Select value={form.packageType} onValueChange={(v) => set("packageType", v)}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {["Carton", "Pallet", "Tote", "Crate"].map((t) => (
+                  {PACKAGE_TYPES.map((t) => (
                     <SelectItem key={t} value={t}>
                       {t}
                     </SelectItem>
@@ -111,20 +209,29 @@ function PackingPage() {
               </Select>
             </Field>
             <Field label="Carton Code">
-              <Input placeholder="CTN-60x40x40" />
+              <Input placeholder="CTN-60x40x40" value={form.carton} onChange={(e) => set("carton", e.target.value)} />
             </Field>
             <Field label="Weight (kg)">
-              <Input type="number" placeholder="18.4" />
+              <Input type="number" placeholder="18.4" value={form.weightKg} onChange={(e) => set("weightKg", e.target.value)} />
             </Field>
             <Field label="Dimensions (cm)">
-              <Input placeholder="60 x 40 x 40" />
+              <Input placeholder="60 x 40 x 40" value={form.dimensions} onChange={(e) => set("dimensions", e.target.value)} />
             </Field>
             <Field label="Packing Materials">
-              <Input placeholder="Double-wall + bubble wrap" />
+              <Input placeholder="Double-wall + bubble wrap" value={form.material} onChange={(e) => set("material", e.target.value)} />
+            </Field>
+            <Field label="Station">
+              <Input placeholder="PACK-01" value={form.station} onChange={(e) => set("station", e.target.value)} />
             </Field>
             <Field label="Label Number">
-              <Input value="LBL-99126" readOnly />
+              <Input value={form.labelNumber} readOnly />
             </Field>
+            <div className="sm:col-span-3 flex justify-end">
+              <Button disabled={!can("pack.execute") || saveMutation.isPending} onClick={submitNewPackage}>
+                <Save className="h-4 w-4" />
+                Save Package
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
@@ -133,7 +240,7 @@ function PackingPage() {
             <CardTitle className="text-sm">Package Summary</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            {(["Carton", "Pallet", "Tote", "Crate"] as const).map((t) => (
+            {PACKAGE_TYPES.map((t) => (
               <div key={t} className="flex items-center justify-between rounded-md border border-border px-3 py-2">
                 <span className="text-muted-foreground">{t}</span>
                 <span className="num font-medium">{rows.filter((r) => r.packageType === t).length}</span>
@@ -150,8 +257,8 @@ function PackingPage() {
         onExport={() => toast.success("Packing report queued")}
         filters={[
           { key: "status", label: "Status", options: ["Pending", "In Progress", "Completed"], match: (r, v) => r.status === v },
-          { key: "packageType", label: "Package Type", options: ["Carton", "Pallet", "Tote", "Crate"], match: (r, v) => r.packageType === v },
-          { key: "station", label: "Station", options: [...new Set(rows.map((r) => r.station))], match: (r, v) => r.station === v },
+          { key: "packageType", label: "Package Type", options: [...PACKAGE_TYPES], match: (r, v) => r.packageType === v },
+          { key: "station", label: "Station", options: [...new Set(rows.map((r) => r.station).filter(Boolean))], match: (r, v) => r.station === v },
         ]}
       />
     </div>

@@ -137,11 +137,11 @@ function SalesOrdersPage() {
   const allocateFn = useServerFn(allocateOrderFn);
   const reserveFn = useServerFn(reserveOrderFn);
 
-  const createMutation = useWmsMutation((args: Parameters<typeof createFn>[0]["data"]) => createFn({ data: args }), {
+  const createMutation = useWmsMutation((args: Record<string, unknown>) => createFn({ data: args as any }), {
     success: () => ({ title: "Sales order created", description: "Order queued for validation and allocation." }),
   });
   const updateMutation = useWmsMutation(
-    (args: { id: string; data: Parameters<typeof updateFn>[0]["data"]["data"] }) => updateFn({ data: args }),
+    (args: { id: string; data: Record<string, unknown> }) => updateFn({ data: args as any }),
     { success: (_r, args) => ({ title: `${args.id} updated` }) },
   );
   const deleteMutation = useWmsMutation((args: { id: string }) => deleteFn({ data: args }), {
@@ -150,7 +150,7 @@ function SalesOrdersPage() {
   const validateMutation = useWmsMutation((args: { id: string }) => validateFn({ data: args }), {
     success: (result: { reason?: string; validation?: string }, args) => ({
       title: `${args.id} validation ${result?.validation ?? "checked"}`,
-      description: result?.reason,
+      ...(result?.reason ? { description: result.reason } : {}),
     }),
   });
   const allocateMutation = useWmsMutation((args: { id: string }) => allocateFn({ data: args }), {
@@ -341,28 +341,28 @@ function SalesOrdersPage() {
             <DialogDescription>Manual order entry. Orders normally arrive via the ERP integration.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Customer" error={errors.customer}>
+            <Field label="Customer" error={errors['customer']}>
               <Selector options={customers.map((c) => c.name)} value={form.customer} onChange={(v) => setForm((f) => ({ ...f, customer: v }))} placeholder="Select customer" />
             </Field>
-            <Field label="Order Date" error={errors.orderDate}>
+            <Field label="Order Date" error={errors['orderDate']}>
               <Input type="date" value={form.orderDate} onChange={(e) => setForm((f) => ({ ...f, orderDate: e.target.value }))} />
             </Field>
-            <Field label="Delivery Date" error={errors.deliveryDate}>
+            <Field label="Delivery Date" error={errors['deliveryDate']}>
               <Input type="date" value={form.deliveryDate} onChange={(e) => setForm((f) => ({ ...f, deliveryDate: e.target.value }))} />
             </Field>
-            <Field label="Priority" error={errors.priority}>
+            <Field label="Priority" error={errors['priority']}>
               <Selector options={PRIORITIES} value={form.priority} onChange={(v) => setForm((f) => ({ ...f, priority: v }))} placeholder="Select priority" />
             </Field>
-            <Field label="Warehouse" error={errors.warehouse}>
+            <Field label="Warehouse" error={errors['warehouse']}>
               <Selector options={warehouses.map((w) => w.code)} value={form.warehouse} onChange={(v) => setForm((f) => ({ ...f, warehouse: v }))} placeholder="Select warehouse" />
             </Field>
-            <Field label="Carrier" error={errors.carrier}>
+            <Field label="Carrier" error={errors['carrier']}>
               <Selector options={carriers} value={form.carrier} onChange={(v) => setForm((f) => ({ ...f, carrier: v }))} placeholder="Select carrier" />
             </Field>
-            <Field label="Route" error={errors.route}>
+            <Field label="Route" error={errors['route']}>
               <Selector options={routes} value={form.route} onChange={(v) => setForm((f) => ({ ...f, route: v }))} placeholder="Select route" />
             </Field>
-            <Field label="Order Value (USD)" error={errors.valueUsd}>
+            <Field label="Order Value (USD)" error={errors['valueUsd']}>
               <Input type="number" value={form.valueUsd} onChange={(e) => setForm((f) => ({ ...f, valueUsd: e.target.value }))} />
             </Field>
           </div>
@@ -375,7 +375,7 @@ function SalesOrdersPage() {
                 Add Line
               </Button>
             </div>
-            {errors.lines && <p className="text-xs text-destructive">{errors.lines}</p>}
+            {errors['lines'] && <p className="text-xs text-destructive">{errors['lines']}</p>}
             <div className="space-y-2">
               {form.lines.map((line, idx) => (
                 <div key={idx} className="grid grid-cols-[1fr_100px_32px] items-end gap-2 rounded-md border border-border p-2">
@@ -473,7 +473,7 @@ function SalesOrdersPage() {
   );
 }
 
-function Field({ label, children, error }: { label: string; children: React.ReactNode; error?: string }) {
+function Field({ label, children, error }: { label: string; children: React.ReactNode; error?: string | undefined }) {
   return (
     <div className="min-w-0">
       <Label className="mb-1.5 block text-xs text-muted-foreground">{label}</Label>
@@ -491,11 +491,11 @@ function Selector({
 }: {
   options: string[];
   placeholder: string;
-  value?: string;
-  onChange?: (v: string) => void;
+  value?: string | undefined;
+  onChange?: ((v: string) => void) | undefined;
 }) {
   return (
-    <Select value={value || undefined} onValueChange={onChange}>
+    <Select {...(value ? { value } : {})} {...(onChange ? { onValueChange: onChange } : {})}>
       <SelectTrigger className="w-full">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>

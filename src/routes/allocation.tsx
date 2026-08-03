@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { AlertTriangle, PackageMinus, PackagePlus, Repeat } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -10,7 +12,9 @@ import { PageHeader } from "@/components/wms/page-header";
 import { StatCard } from "@/components/wms/stat-card";
 import { StatusBadge } from "@/components/wms/status-badge";
 import { useRole } from "@/context/role-context";
-import { inventory, warehouses, zones, type InventoryRecord } from "@/data/mock-data";
+import { inventoryActionFn } from "@/lib/wms.functions";
+import { inventoryQuery, referenceQuery, useWmsMutation } from "@/lib/wms-queries";
+import type { InventoryRecord } from "@/lib/wms-types";
 
 export const Route = createFileRoute("/allocation")({
   head: () => ({
@@ -26,30 +30,37 @@ export const Route = createFileRoute("/allocation")({
 
 function AllocationPage() {
   const { can } = useRole();
-  const [records, setRecords] = useState<InventoryRecord[]>(inventory);
+  const inventoryQ = useQuery(inventoryQuery());
+  const referenceQ = useQuery(referenceQuery());
+  const records = inventoryQ.data?.rows ?? [];
+  const warehouses = referenceQ.data?.warehouses ?? [];
+  const zones = referenceQ.data?.zones ?? [];
+
   const [selected, setSelected] = useState<string[]>([]);
 
   const outOfStock = records.filter((r) => r.status === "Out of Stock");
+
+  const inventoryActionServerFn = useServerFn(inventoryActionFn);
+  const actionMutation = useWmsMutation(
+    (args: { ids: string[]; kind: "reserve" | "release" | "reallocate"; qty: number }) => inventoryActionServerFn({ data: args }),
+    {
+      success: (_r, args) => ({
+        title:
+          args.kind === "reserve" ? "Inventory reserved" : args.kind === "release" ? "Reservation released" : "Inventory reallocated",
+        description: `${args.ids.length} record(s) updated.`,
+      }),
+    },
+  );
 
   const act = (kind: "reserve" | "release" | "reallocate") => {
     if (selected.length === 0) {
       toast.warning("Select at least one inventory record");
       return;
     }
-    // TODO(integration): call the Inventory API reservation endpoints.
-    setRecords((s) =>
-      s.map((r) => {
-        if (!selected.includes(r.id)) return r;
-        if (kind === "reserve") return { ...r, reserved: r.reserved + Math.min(10, r.available), available: Math.max(0, r.available - 10) };
-        if (kind === "release") return { ...r, reserved: Math.max(0, r.reserved - 10), available: r.available + 10 };
-        return { ...r, allocated: r.allocated + 5 };
-      }),
+    actionMutation.mutate(
+      { ids: selected, kind, qty: 10 },
+      { onSuccess: () => setSelected([]) },
     );
-    toast.success(
-      kind === "reserve" ? "Inventory reserved" : kind === "release" ? "Reservation released" : "Inventory reallocated",
-      { description: `${selected.length} record(s) updated.` },
-    );
-    setSelected([]);
   };
 
   const columns: Column<InventoryRecord>[] = [
@@ -84,15 +95,15 @@ function AllocationPage() {
         breadcrumbs={[{ label: "Order Management" }, { label: "Inventory Allocation" }]}
         actions={
           <>
-            <Button variant="outline" disabled={!can("inventory.reserve")} onClick={() => act("release")}>
+            <Button variant="outline" disabled={!can("inventory.reserve") || actionMutation.isPending} onClick={() => act("release")}>
               <PackageMinus className="h-4 w-4" />
               Release Reservation
             </Button>
-            <Button variant="outline" disabled={!can("inventory.reserve")} onClick={() => act("reallocate")}>
+            <Button variant="outline" disabled={!can("inventory.reserve") || actionMutation.isPending} onClick={() => act("reallocate")}>
               <Repeat className="h-4 w-4" />
               Reallocate
             </Button>
-            <Button disabled={!can("inventory.reserve")} onClick={() => act("reserve")}>
+            <Button disabled={!can("inventory.reserve") || actionMutation.isPending} onClick={() => act("reserve")}>
               <PackagePlus className="h-4 w-4" />
               Reserve Inventory
             </Button>
@@ -120,6 +131,7 @@ function AllocationPage() {
       <DataTable
         data={records}
         columns={columns}
+        loading={inventoryQ.isLoading}
         pageSize={10}
         searchKeys={(r) => `${r.sku} ${r.product} ${r.warehouse} ${r.location}`}
         onExport={() => toast.success("Export queued", { description: "TODO: connect Reporting Engine." })}
