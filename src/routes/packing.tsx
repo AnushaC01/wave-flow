@@ -55,11 +55,11 @@ function PackingPage() {
   const [form, setForm] = useState(emptyForm);
 
   const saveFn = useServerFn(savePackingFn);
-  const saveMutation = useWmsMutation((args: Parameters<typeof saveFn>[0]["data"]) => saveFn({ data: args }), {
+  const saveMutation = useWmsMutation((args: Record<string, unknown>) => saveFn({ data: args as never }), {
     success: () => ({ title: "Package saved" }),
   });
 
-  const completeMutation = useWmsMutation((args: Parameters<typeof saveFn>[0]["data"]) => saveFn({ data: args }), {
+  const completeMutation = useWmsMutation((args: Record<string, unknown>) => saveFn({ data: args as never }), {
     success: (_r, args) => ({ title: "Packing completed", description: `${args.order} ready for staging.` }),
   });
 

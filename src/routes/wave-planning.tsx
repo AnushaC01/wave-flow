@@ -92,10 +92,10 @@ function WavePlanningPage() {
   const updateFn = useServerFn(updateWaveFn);
   const deleteFn = useServerFn(deleteWaveFn);
 
-  const createMutation = useWmsMutation((args: Parameters<typeof createFn>[0]["data"]) => createFn({ data: args }), {
+  const createMutation = useWmsMutation((args: Record<string, unknown>) => createFn({ data: args as never }), {
     success: () => ({ title: "Wave created", description: "Awaiting reservation confirmation." }),
   });
-  const updateMutation = useWmsMutation((args: { id: string; data: Parameters<typeof updateFn>[0]["data"]["data"] }) => updateFn({ data: args }), {
+  const updateMutation = useWmsMutation((args: { id: string; data: Record<string, unknown> }) => updateFn({ data: args as never }), {
     success: (_r, args) => ({ title: `${args.id} updated` }),
   });
   const deleteMutation = useWmsMutation((args: { id: string }) => deleteFn({ data: args }), {
@@ -389,7 +389,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function Picker({ options, placeholder, value, onChange }: { options: string[]; placeholder: string; value: string; onChange: (v: string) => void }) {
   return (
-    <Select value={value || undefined} onValueChange={onChange}>
+    <Select {...(value ? { value } : {})} onValueChange={onChange}>
       <SelectTrigger className="w-full">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
