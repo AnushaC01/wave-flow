@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   AlertTriangle,
@@ -37,18 +38,9 @@ import { PageHeader } from "@/components/wms/page-header";
 import { StatCard } from "@/components/wms/stat-card";
 import { StatusBadge } from "@/components/wms/status-badge";
 import { WorkflowStepper } from "@/components/wms/workflow-stepper";
-import {
-  activities,
-  backorders,
-  dailyFulfillmentChart,
-  notifications,
-  ordersByPriorityChart,
-  salesOrders,
-  shipmentTrendChart,
-  waveStatusChart,
-  waves,
-  workflowSteps,
-} from "@/data/mock-data";
+import { workflowSteps } from "@/data/mock-data";
+import { activityQuery, dashboardQuery, notificationsQuery, ordersQuery, WORKFLOW_KEYS } from "@/lib/wms-queries";
+import type { DashboardStats } from "@/lib/wms-types";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -67,24 +59,55 @@ export const Route = createFileRoute("/")({
 
 const CHART_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
 
-function count(fn: (s: (typeof salesOrders)[number]) => boolean) {
-  return salesOrders.filter(fn).length;
-}
+const EMPTY_DASHBOARD: DashboardStats = {
+  totalOrders: 0,
+  ordersToday: 0,
+  openWaves: 0,
+  releasedWaves: 0,
+  pickLinesPending: 0,
+  packagesPacked: 0,
+  shipmentsInTransit: 0,
+  awaitingDispatch: 0,
+  openBackorders: 0,
+  unitsShipped: 0,
+  fulfilmentRate: 0,
+  onTimeRate: 0,
+  waveStatusChart: [],
+  ordersByPriorityChart: [],
+  shipmentTrendChart: [],
+  dailyFulfillmentChart: [],
+  orderStatusChart: [],
+  carrierChart: [],
+};
 
 function DashboardPage() {
+  const queryClient = useQueryClient();
+  const { data: dashboard = EMPTY_DASHBOARD } = useQuery(dashboardQuery());
+  const { data: activities = [] } = useQuery(activityQuery());
+  const { data: notifications = [] } = useQuery(notificationsQuery());
+  const { data: ordersResult } = useQuery(ordersQuery());
+  const orders = ordersResult?.rows ?? [];
+
+  function count(fn: (s: (typeof orders)[number]) => boolean) {
+    return orders.filter(fn).length;
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const lateOrders = orders.filter((o) => o.deliveryDate < today && o.status !== "Shipped").length;
+
   const kpis = [
-    { label: "Total Sales Orders", value: salesOrders.length, icon: <ShoppingCart className="h-4 w-4" />, tone: "primary" as const },
+    { label: "Total Sales Orders", value: dashboard.totalOrders, icon: <ShoppingCart className="h-4 w-4" />, tone: "primary" as const },
     { label: "Pending Planning", value: count((o) => ["Received", "Validated", "Allocated"].includes(o.status)), icon: <ClipboardList className="h-4 w-4" /> },
     { label: "Orders Reserved", value: count((o) => o.status === "Reserved"), icon: <Boxes className="h-4 w-4" />, tone: "primary" as const },
-    { label: "Active Waves", value: waves.filter((w) => ["Planned", "Draft"].includes(w.status)).length, icon: <Layers className="h-4 w-4" /> },
-    { label: "Released Waves", value: waves.filter((w) => ["Released", "Picking"].includes(w.status)).length, icon: <Rocket className="h-4 w-4" />, tone: "primary" as const },
+    { label: "Active Waves", value: dashboard.openWaves, icon: <Layers className="h-4 w-4" /> },
+    { label: "Released Waves", value: dashboard.releasedWaves, icon: <Rocket className="h-4 w-4" />, tone: "primary" as const },
     { label: "Orders Picking", value: count((o) => o.status === "Picking"), icon: <Activity className="h-4 w-4" />, tone: "warning" as const },
     { label: "Orders Packed", value: count((o) => o.status === "Packed"), icon: <PackageCheck className="h-4 w-4" />, tone: "success" as const },
     { label: "Orders Staged", value: count((o) => o.status === "Staged"), icon: <ClipboardList className="h-4 w-4" /> },
     { label: "Ready for Shipment", value: count((o) => o.status === "Ready for Shipment"), icon: <Truck className="h-4 w-4" />, tone: "primary" as const },
     { label: "Orders Shipped", value: count((o) => o.status === "Shipped"), icon: <Truck className="h-4 w-4" />, tone: "success" as const },
-    { label: "Late Orders", value: 3, icon: <Timer className="h-4 w-4" />, tone: "danger" as const },
-    { label: "Backorders", value: backorders.filter((b) => b.status !== "Closed").length, icon: <AlertTriangle className="h-4 w-4" />, tone: "danger" as const },
+    { label: "Late Orders", value: lateOrders, icon: <Timer className="h-4 w-4" />, tone: "danger" as const },
+    { label: "Backorders", value: dashboard.openBackorders, icon: <AlertTriangle className="h-4 w-4" />, tone: "danger" as const },
   ];
 
   const quickActions = [
@@ -94,6 +117,11 @@ function DashboardPage() {
     { label: "Print Shipping Labels", icon: Printer, to: "/shipping-labels" },
   ];
 
+  function handleRefresh() {
+    for (const key of WORKFLOW_KEYS) void queryClient.invalidateQueries({ queryKey: [key] });
+    toast.success("Dashboard refreshed");
+  }
+
   return (
     <div>
       <PageHeader
@@ -102,7 +130,7 @@ function DashboardPage() {
         breadcrumbs={[{ label: "Dashboard" }]}
         actions={
           <>
-            <Button variant="outline" onClick={() => toast.success("Dashboard refreshed", { description: "Mock data reloaded." })}>
+            <Button variant="outline" onClick={handleRefresh}>
               Refresh
             </Button>
             <Button asChild>
@@ -137,7 +165,7 @@ function DashboardPage() {
           </CardHeader>
           <CardContent className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={shipmentTrendChart}>
+              <AreaChart data={dashboard.shipmentTrendChart}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="day" tick={{ fontSize: 12 }} stroke="var(--muted-foreground)" />
                 <YAxis tick={{ fontSize: 12 }} stroke="var(--muted-foreground)" />
@@ -157,8 +185,8 @@ function DashboardPage() {
           <CardContent className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={waveStatusChart} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80} paddingAngle={3}>
-                  {waveStatusChart.map((_, i) => (
+                <Pie data={dashboard.waveStatusChart} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80} paddingAngle={3}>
+                  {dashboard.waveStatusChart.map((_, i) => (
                     <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                   ))}
                 </Pie>
@@ -175,7 +203,7 @@ function DashboardPage() {
           </CardHeader>
           <CardContent className="h-56">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={ordersByPriorityChart}>
+              <BarChart data={dashboard.ordersByPriorityChart}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="priority" tick={{ fontSize: 12 }} stroke="var(--muted-foreground)" />
                 <YAxis tick={{ fontSize: 12 }} stroke="var(--muted-foreground)" />
@@ -192,7 +220,7 @@ function DashboardPage() {
           </CardHeader>
           <CardContent className="h-56">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={dailyFulfillmentChart}>
+              <LineChart data={dashboard.dailyFulfillmentChart}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="hour" tick={{ fontSize: 12 }} stroke="var(--muted-foreground)" />
                 <YAxis tick={{ fontSize: 12 }} stroke="var(--muted-foreground)" />
