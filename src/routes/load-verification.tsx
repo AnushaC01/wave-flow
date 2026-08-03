@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -12,7 +14,9 @@ import { PageHeader } from "@/components/wms/page-header";
 import { StatCard } from "@/components/wms/stat-card";
 import { StatusBadge } from "@/components/wms/status-badge";
 import { useRole } from "@/context/role-context";
-import { shipments, type Shipment } from "@/data/mock-data";
+import { shipmentsQuery, useWmsMutation } from "@/lib/wms-queries";
+import { verifyLoadFn } from "@/lib/wms.functions";
+import type { Shipment } from "@/lib/wms-types";
 
 export const Route = createFileRoute("/load-verification")({
   head: () => ({
@@ -36,9 +40,11 @@ const CHECKS = [
 ];
 
 function LoadVerificationPage() {
-  const { can } = useRole();
-  const [rows, setRows] = useState<Shipment[]>(shipments);
-  const [selected, setSelected] = useState<Shipment>(shipments[2]!);
+  const { can, role } = useRole();
+  const { data: shipmentsResult } = useQuery(shipmentsQuery());
+  const rows: Shipment[] = shipmentsResult?.rows ?? [];
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = rows.find((r) => r.id === selectedId) ?? rows[0] ?? null;
   const [checked, setChecked] = useState<string[]>([]);
 
   const allChecked = CHECKS.every((c) => checked.includes(c));
@@ -46,14 +52,18 @@ function LoadVerificationPage() {
   const toggle = (c: string) =>
     setChecked((s) => (s.includes(c) ? s.filter((x) => x !== c) : [...s, c]));
 
+  const verifyFn = useServerFn(verifyLoadFn);
+  const verifyMutation = useWmsMutation((args: Parameters<typeof verifyFn>[0]["data"]) => verifyFn({ data: args }), {
+    success: (_r, args) => ({ title: `${args.id} load verified`, description: "Shipment can now be sent for dispatch approval." }),
+  });
+
   const verify = () => {
+    if (!selected) return;
     if (!allChecked) {
       toast.error("Verification incomplete", { description: "All checklist items must be confirmed before verification." });
       return;
     }
-    // TODO(integration): persist verification via the Shipment Verification API.
-    setRows((s) => s.map((r) => (r.id === selected.id ? { ...r, loadVerified: true } : r)));
-    toast.success(`${selected.id} load verified`, { description: "Shipment can now be sent for dispatch approval." });
+    verifyMutation.mutate({ id: selected.id, checklist: checked, actor: role });
   };
 
   const columns: Column<Shipment>[] = [
@@ -74,7 +84,7 @@ function LoadVerificationPage() {
       header: "Actions",
       sortable: false,
       render: (r) => (
-        <Button size="sm" variant={selected.id === r.id ? "default" : "outline"} onClick={() => { setSelected(r); setChecked([]); }}>
+        <Button size="sm" variant={selected?.id === r.id ? "default" : "outline"} onClick={() => { setSelectedId(r.id); setChecked([]); }}>
           Open Checklist
         </Button>
       ),
@@ -108,7 +118,7 @@ function LoadVerificationPage() {
 
         <Card className="h-fit border-border shadow-[var(--shadow-card)]">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Checklist · {selected.id}</CardTitle>
+            <CardTitle className="text-sm">Checklist · {selected?.id ?? "—"}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {CHECKS.map((c) => (
@@ -127,7 +137,7 @@ function LoadVerificationPage() {
                 </AlertDescription>
               </Alert>
             )}
-            <Button className="w-full" disabled={!can("load.verify")} onClick={verify}>
+            <Button className="w-full" disabled={!can("load.verify") || !selected || verifyMutation.isPending} onClick={verify}>
               <ShieldCheck className="h-4 w-4" />
               Confirm Verification
             </Button>
