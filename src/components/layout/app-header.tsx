@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ROLES, useRole, type Role } from "@/context/role-context";
-import { warehouses } from "@/data/mock-data";
+import { useQuery } from "@tanstack/react-query";
+import { referenceQuery } from "@/lib/wms-queries";
 
 export function AppHeader({
   onMenu,
@@ -19,7 +20,10 @@ export function AppHeader({
   children?: ReactNode;
 }) {
   const { role, setRole } = useRole();
-  const [warehouse, setWarehouse] = useState(warehouses[0]!.code);
+  const { data: reference } = useQuery(referenceQuery());
+  const warehouses = reference?.warehouses ?? [];
+  const [warehouse, setWarehouse] = useState("");
+  const activeWarehouse = warehouse || warehouses[0]?.code || "";
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-card/95 backdrop-blur">
@@ -37,7 +41,7 @@ export function AppHeader({
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2">
-          <Select value={warehouse} onValueChange={setWarehouse}>
+          <Select value={activeWarehouse} onValueChange={setWarehouse}>
             <SelectTrigger className="hidden h-9 w-[190px] xl:flex" aria-label="Warehouse">
               <Building2 className="h-4 w-4 text-muted-foreground" />
               <SelectValue />

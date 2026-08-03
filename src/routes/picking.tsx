@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { CheckCircle2, Pause, Play, ScanBarcode } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -12,7 +14,9 @@ import { PageHeader } from "@/components/wms/page-header";
 import { StatCard } from "@/components/wms/stat-card";
 import { StatusBadge } from "@/components/wms/status-badge";
 import { useRole } from "@/context/role-context";
-import { pickLines, waves, zones, type PickLine } from "@/data/mock-data";
+import { errorMessage, pickLinesQuery, referenceQuery, useWmsMutation, wavesQuery } from "@/lib/wms-queries";
+import { completeWavePickingFn, confirmPickFn, updatePickLineFn } from "@/lib/wms.functions";
+import type { PickLine } from "@/lib/wms-types";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/picking")({
@@ -31,25 +35,51 @@ const MAP_ZONES = ["Zone A", "Zone B", "Zone C", "Zone D", "Bulk Zone", "Cold Zo
 
 function PickingPage() {
   const { can } = useRole();
-  const [rows, setRows] = useState<PickLine[]>(pickLines);
+  const { data: pickLinesResult, isLoading } = useQuery(pickLinesQuery());
+  const { data: wavesResult } = useQuery(wavesQuery());
+  const { data: reference } = useQuery(referenceQuery());
+  const rows: PickLine[] = pickLinesResult?.rows ?? [];
+  const waves = wavesResult?.rows ?? [];
+  const zones = reference?.zones ?? [];
+
   const [session, setSession] = useState<"idle" | "active" | "paused">("active");
   const [scan, setScan] = useState("");
-  const [active, setActive] = useState<PickLine | null>(pickLines[0] ?? null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  const active = rows.find((r) => r.id === activeId) ?? rows[0] ?? null;
 
   const totalQty = rows.reduce((s, r) => s + r.quantity, 0);
   const pickedQty = rows.reduce((s, r) => s + r.pickedQty, 0);
 
+  const confirmPickServerFn = useServerFn(confirmPickFn);
+  const updatePickLineServerFn = useServerFn(updatePickLineFn);
+  const completeWavePickingServerFn = useServerFn(completeWavePickingFn);
+
+  const confirmPickMutation = useWmsMutation(
+    (args: { id: string; barcode: string; qty: number; picker: string }) => confirmPickServerFn({ data: args }),
+    { success: (_r, args) => ({ title: "Item verified & picked", description: `Pick line ${args.id} confirmed.` }) },
+  );
+  const updatePickLineMutation = useWmsMutation(
+    (args: { id: string; data: { picker?: string; status?: PickLine["status"]; pickedQty?: number; verified?: boolean } }) =>
+      updatePickLineServerFn({ data: args as never }),
+    { success: () => ({ title: "Pick line updated" }) },
+  );
+  const completePickingMutation = useWmsMutation((args: { wave: string }) => completeWavePickingServerFn({ data: args }), {
+    success: (_r, args) => ({ title: `${args.wave} picking completed`, description: "Orders released to packing." }),
+  });
+
   const verifyScan = () => {
     if (!active) return;
-    if (scan.trim() !== active.barcode) {
-      toast.error("Barcode mismatch", { description: "Scanned barcode does not match the pick line. Item cannot be confirmed." });
-      return;
-    }
-    // TODO(integration): send verification event to the Barcode Scanner / device gateway.
-    setRows((s) => s.map((r) => (r.id === active.id ? { ...r, verified: true, pickedQty: r.quantity, status: "Picked" } : r)));
-    toast.success("Item verified & picked", { description: `${active.sku} confirmed at ${active.location}.` });
-    setScan("");
+    confirmPickMutation.mutate(
+      { id: active.id, barcode: scan.trim(), qty: active.quantity, picker: active.picker },
+      {
+        onSuccess: () => setScan(""),
+        onError: (err) => toast.error("Barcode mismatch", { description: errorMessage(err) }),
+      },
+    );
   };
+
+  const activeWaves = waves.filter((w) => ["Released", "Picking"].includes(w.status));
 
   const columns: Column<PickLine>[] = [
     { key: "id", header: "Pick Line", value: (r) => r.id, render: (r) => <span className="font-medium text-primary">{r.id}</span> },
@@ -72,13 +102,27 @@ function PickingPage() {
       header: "Actions",
       sortable: false,
       render: (r) => (
-        <Button size="sm" variant={active?.id === r.id ? "default" : "outline"} onClick={() => setActive(r)}>
+        <Button size="sm" variant={active?.id === r.id ? "default" : "outline"} onClick={() => setActiveId(r.id)}>
           <ScanBarcode className="h-4 w-4" />
           Scan
         </Button>
       ),
     },
   ];
+
+  const completePicking = () => {
+    const wave = active?.wave ?? activeWaves[0]?.id;
+    if (!wave) {
+      toast.info("No active wave to complete");
+      return;
+    }
+    completePickingMutation.mutate(
+      { wave },
+      {
+        onError: (err) => toast.error("Complete picking failed", { description: errorMessage(err) }),
+      },
+    );
+  };
 
   return (
     <div>
@@ -97,7 +141,7 @@ function PickingPage() {
               <Play className="h-4 w-4" />
               Resume
             </Button>
-            <Button variant="outline" disabled={!can("pick.execute")} onClick={() => { setSession("idle"); toast.success("Picking completed", { description: "Orders released to packing." }); }}>
+            <Button variant="outline" disabled={!can("pick.execute") || completePickingMutation.isPending} onClick={completePicking}>
               <CheckCircle2 className="h-4 w-4" />
               Complete Picking
             </Button>
@@ -122,13 +166,12 @@ function PickingPage() {
             <CardTitle className="text-sm">Barcode Verification</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {/* TODO(integration): bind to the physical barcode scanner / warehouse device SDK. */}
             <p className="text-xs text-muted-foreground">
               Active line: <span className="font-medium text-foreground">{active?.id ?? "—"}</span> · {active?.sku} @ {active?.location}
             </p>
             <div className="flex gap-2">
               <Input value={scan} onChange={(e) => setScan(e.target.value)} placeholder={active ? `Scan ${active.barcode}` : "Select a pick line"} />
-              <Button onClick={verifyScan} disabled={!active || !can("pick.execute")}>
+              <Button onClick={verifyScan} disabled={!active || !can("pick.execute") || confirmPickMutation.isPending}>
                 Verify
               </Button>
             </div>
@@ -147,7 +190,7 @@ function PickingPage() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-4 gap-2">
-              {MAP_ZONES.map((z) => {
+              {(zones.length ? zones : MAP_ZONES).map((z) => {
                 const linesHere = rows.filter((r) => r.zone === z).length;
                 return (
                   <div
@@ -172,21 +215,19 @@ function PickingPage() {
             <CardTitle className="text-sm">Wave Progress</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {waves
-              .filter((w) => ["Released", "Picking"].includes(w.status))
-              .map((w) => {
-                const wl = rows.filter((r) => r.wave === w.id);
-                const pct = wl.length ? Math.round((wl.filter((r) => r.status === "Picked").length / wl.length) * 100) : 0;
-                return (
-                  <div key={w.id}>
-                    <div className="mb-1 flex items-center justify-between text-xs">
-                      <span className="font-medium text-foreground">{w.id}</span>
-                      <span className="num text-muted-foreground">{pct}%</span>
-                    </div>
-                    <Progress value={pct} className="h-1.5" />
+            {activeWaves.map((w) => {
+              const wl = rows.filter((r) => r.wave === w.id);
+              const pct = wl.length ? Math.round((wl.filter((r) => r.status === "Picked").length / wl.length) * 100) : 0;
+              return (
+                <div key={w.id}>
+                  <div className="mb-1 flex items-center justify-between text-xs">
+                    <span className="font-medium text-foreground">{w.id}</span>
+                    <span className="num text-muted-foreground">{pct}%</span>
                   </div>
-                );
-              })}
+                  <Progress value={pct} className="h-1.5" />
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
       </div>
@@ -194,6 +235,7 @@ function PickingPage() {
       <DataTable
         data={rows}
         columns={columns}
+        loading={isLoading}
         pageSize={8}
         searchKeys={(r) => `${r.id} ${r.picker} ${r.sku} ${r.product} ${r.location}`}
         filters={[

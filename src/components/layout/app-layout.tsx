@@ -1,14 +1,19 @@
 import { useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { AppHeader } from "./app-header";
 import { AppSidebar } from "./app-sidebar";
 import { NotificationPanel } from "./notification-panel";
-import { notifications as seedNotifications } from "@/data/mock-data";
+import { notificationsQuery, useWmsMutation } from "@/lib/wms-queries";
+import { markNotificationsReadFn } from "@/lib/wms.functions";
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
-  const [items, setItems] = useState(seedNotifications);
+  const { data: items = [] } = useQuery(notificationsQuery());
   const unread = items.filter((n) => !n.read).length;
+  const markAllRead = useWmsMutation(() => markNotificationsReadFn(), {
+    success: () => ({ title: "All notifications marked as read" }),
+  });
 
   return (
     <div className="flex min-h-screen w-full bg-background">
@@ -27,7 +32,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
         open={panelOpen}
         onOpenChange={setPanelOpen}
         items={items}
-        onMarkAllRead={() => setItems((s) => s.map((n) => ({ ...n, read: true })))}
+        onMarkAllRead={() => markAllRead.mutate(undefined)}
       />
     </div>
   );

@@ -1,5 +1,6 @@
-import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { ClipboardCheck, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,9 @@ import { PageHeader } from "@/components/wms/page-header";
 import { StatCard } from "@/components/wms/stat-card";
 import { StatusBadge } from "@/components/wms/status-badge";
 import { useRole } from "@/context/role-context";
-import { docks, shipments, type Shipment } from "@/data/mock-data";
+import { referenceQuery, shipmentsQuery, useWmsMutation } from "@/lib/wms-queries";
+import { updateShipmentFn } from "@/lib/wms.functions";
+import { SHIPMENT_STATUSES, type Shipment } from "@/lib/wms-types";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/staging")({
@@ -26,7 +29,15 @@ export const Route = createFileRoute("/staging")({
 
 function StagingPage() {
   const { can } = useRole();
-  const [rows, setRows] = useState<Shipment[]>(shipments);
+  const { data: shipmentsResult } = useQuery(shipmentsQuery());
+  const { data: reference } = useQuery(referenceQuery());
+  const rows: Shipment[] = shipmentsResult?.rows ?? [];
+  const docks = reference?.docks ?? [];
+
+  const updateFn = useServerFn(updateShipmentFn);
+  const moveToLoading = useWmsMutation((args: { id: string; data: Record<string, unknown> }) => updateFn({ data: args as never }), {
+    success: (_r, args) => ({ title: `${args.id} moved to loading` }),
+  });
 
   const columns: Column<Shipment>[] = [
     { key: "id", header: "Shipment", value: (r) => r.id, render: (r) => <span className="font-medium text-primary">{r.id}</span> },
@@ -44,11 +55,8 @@ function StagingPage() {
         <Button
           size="sm"
           variant="outline"
-          disabled={r.status !== "Staged" || !can("load.execute")}
-          onClick={() => {
-            setRows((s) => s.map((x) => (x.id === r.id ? { ...x, status: "Loading" } : x)));
-            toast.success(`${r.id} moved to loading`, { description: `${r.dock} assigned.` });
-          }}
+          disabled={r.status !== "Staged" || !can("load.execute") || moveToLoading.isPending}
+          onClick={() => moveToLoading.mutate({ id: r.id, data: { status: "Loading" } })}
         >
           <ClipboardCheck className="h-4 w-4" />
           Move to Loading
@@ -105,7 +113,7 @@ function StagingPage() {
         onExport={() => toast.success("Staging report exported")}
         filters={[
           { key: "dock", label: "Dock", options: docks, match: (r, v) => r.dock === v },
-          { key: "status", label: "Status", options: ["Staged", "Loading", "Ready for Shipment", "In Transit", "Delivered"], match: (r, v) => r.status === v },
+          { key: "status", label: "Status", options: [...SHIPMENT_STATUSES], match: (r, v) => r.status === v },
         ]}
       />
     </div>

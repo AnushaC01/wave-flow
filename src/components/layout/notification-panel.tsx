@@ -2,7 +2,7 @@ import { Bell, CheckCheck, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { notifications as seed } from "@/data/mock-data";
+import type { NotificationItem } from "@/lib/wms-types";
 import { cn } from "@/lib/utils";
 
 const SEVERITY: Record<string, string> = {
@@ -20,7 +20,7 @@ export function NotificationPanel({
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  items: typeof seed;
+  items: NotificationItem[];
   onMarkAllRead: () => void;
 }) {
   return (
@@ -36,7 +36,6 @@ export function NotificationPanel({
             Mark all read
           </Button>
         </SheetHeader>
-        {/* TODO(integration): subscribe to the enterprise Notification Service (WebSocket / SSE). */}
         <ScrollArea className="h-[calc(100vh-3.75rem)]">
           <ul className="divide-y divide-border">
             {items.map((n) => (

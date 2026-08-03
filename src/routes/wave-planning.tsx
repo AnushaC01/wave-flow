@@ -1,7 +1,19 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { Eye, Layers, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -15,7 +27,9 @@ import { PageHeader } from "@/components/wms/page-header";
 import { StatCard } from "@/components/wms/stat-card";
 import { StatusBadge } from "@/components/wms/status-badge";
 import { useRole } from "@/context/role-context";
-import { carriers, routes, salesOrders, warehouses, waves, zones, type Wave } from "@/data/mock-data";
+import { errorMessage, ordersQuery, referenceQuery, useWmsMutation, wavesQuery } from "@/lib/wms-queries";
+import { createWaveFn, deleteWaveFn, updateWaveFn } from "@/lib/wms.functions";
+import { waveInput, type Priority, type SalesOrder, type Wave } from "@/lib/wms-types";
 
 export const Route = createFileRoute("/wave-planning")({
   head: () => ({
@@ -29,14 +43,130 @@ export const Route = createFileRoute("/wave-planning")({
   component: WavePlanningPage,
 });
 
+const PRIORITIES: Priority[] = ["Critical", "High", "Medium", "Low"];
+
+interface FormState {
+  name: string;
+  warehouse: string;
+  zone: string;
+  priority: Priority | "";
+  carrier: string;
+  route: string;
+  deliveryDate: string;
+  capacity: string;
+}
+
+const EMPTY_FORM: FormState = {
+  name: "",
+  warehouse: "",
+  zone: "",
+  priority: "",
+  carrier: "",
+  route: "",
+  deliveryDate: "",
+  capacity: "80",
+};
+
 function WavePlanningPage() {
   const { can } = useRole();
-  const [rows, setRows] = useState<Wave[]>(waves);
+  const { data: wavesResult, isLoading } = useQuery(wavesQuery());
+  const { data: ordersResult } = useQuery(ordersQuery());
+  const { data: reference } = useQuery(referenceQuery());
+  const rows = wavesResult?.rows ?? [];
+  const salesOrders: SalesOrder[] = ordersResult?.rows ?? [];
+  const warehouses = reference?.warehouses ?? [];
+  const zones = reference?.zones ?? [];
+  const carriers = reference?.carriers ?? [];
+  const routes = reference?.routes ?? [];
+
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<Wave | null>(null);
   const [preview, setPreview] = useState<Wave | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Wave | null>(null);
   const [pickedOrders, setPickedOrders] = useState<string[]>([]);
+  const [form, setForm] = useState<FormState>(EMPTY_FORM);
 
   const eligible = salesOrders.filter((o) => ["Reserved", "Allocated", "Validated"].includes(o.status));
+
+  const createFn = useServerFn(createWaveFn);
+  const updateFn = useServerFn(updateWaveFn);
+  const deleteFn = useServerFn(deleteWaveFn);
+
+  const createMutation = useWmsMutation((args: Record<string, unknown>) => createFn({ data: args as never }), {
+    success: () => ({ title: "Wave created", description: "Awaiting reservation confirmation." }),
+  });
+  const updateMutation = useWmsMutation((args: { id: string; data: Record<string, unknown> }) => updateFn({ data: args as never }), {
+    success: (_r, args) => ({ title: `${args.id} updated` }),
+  });
+  const deleteMutation = useWmsMutation((args: { id: string }) => deleteFn({ data: args }), {
+    success: (_r, args) => ({ title: `${args.id} deleted` }),
+  });
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm(EMPTY_FORM);
+    setPickedOrders([]);
+    setOpen(true);
+  };
+
+  const openEdit = (w: Wave) => {
+    setEditing(w);
+    setForm({
+      name: w.name,
+      warehouse: w.warehouse,
+      zone: w.zone,
+      priority: w.priority,
+      carrier: w.carrier,
+      route: w.route,
+      deliveryDate: w.deliveryDate,
+      capacity: String(w.capacity),
+    });
+    setPickedOrders(w.orders);
+    setOpen(true);
+  };
+
+  const selectedOrders = salesOrders.filter((o) => pickedOrders.includes(o.id));
+  const computedLines = selectedOrders.reduce((s, o) => s + o.lines.length, 0);
+
+  const submit = () => {
+    const parsed = waveInput.safeParse({
+      id: editing?.id,
+      name: form.name,
+      warehouse: form.warehouse,
+      zone: form.zone,
+      priority: form.priority || undefined,
+      carrier: form.carrier,
+      route: form.route,
+      deliveryDate: form.deliveryDate,
+      capacity: Number(form.capacity) || 0,
+      status: editing?.status ?? "Draft",
+      createdBy: editing?.createdBy ?? "System",
+      orders: pickedOrders,
+    });
+    if (!parsed.success) {
+      toast.error("Invalid wave", { description: parsed.error.issues[0]?.message });
+      return;
+    }
+    if (editing) {
+      updateMutation.mutate(
+        { id: editing.id, data: parsed.data },
+        {
+          onSuccess: () => {
+            setOpen(false);
+            setPickedOrders([]);
+          },
+        },
+      );
+    } else {
+      createMutation.mutate(parsed.data, {
+        onSuccess: () => {
+          setOpen(false);
+          setPickedOrders([]);
+        },
+        onError: (err) => toast.error("Failed to create wave", { description: errorMessage(err) }),
+      });
+    }
+  };
 
   const columns: Column<Wave>[] = [
     { key: "id", header: "Wave Number", value: (r) => r.id, render: (r) => <span className="font-medium text-primary">{r.id}</span> },
@@ -51,10 +181,10 @@ function WavePlanningPage() {
     {
       key: "capacity",
       header: "Capacity",
-      value: (r) => r.lines / r.capacity,
+      value: (r) => (r.capacity ? r.lines / r.capacity : 0),
       render: (r) => (
         <div className="w-28">
-          <Progress value={Math.round((r.lines / r.capacity) * 100)} className="h-1.5" />
+          <Progress value={r.capacity ? Math.round((r.lines / r.capacity) * 100) : 0} className="h-1.5" />
           <span className="num text-[11px] text-muted-foreground">
             {r.lines}/{r.capacity} lines
           </span>
@@ -71,7 +201,7 @@ function WavePlanningPage() {
           <Button size="icon" variant="ghost" aria-label="Preview" onClick={() => setPreview(r)}>
             <Eye className="h-4 w-4" />
           </Button>
-          <Button size="icon" variant="ghost" aria-label="Edit" disabled={!can("wave.create")} onClick={() => toast.info(`Editing ${r.id}`)}>
+          <Button size="icon" variant="ghost" aria-label="Edit" disabled={!can("wave.create")} onClick={() => openEdit(r)}>
             <Pencil className="h-4 w-4" />
           </Button>
           <Button
@@ -79,10 +209,7 @@ function WavePlanningPage() {
             variant="ghost"
             aria-label="Delete"
             disabled={!can("wave.create") || r.status !== "Draft"}
-            onClick={() => {
-              setRows((s) => s.filter((w) => w.id !== r.id));
-              toast.success(`${r.id} deleted`);
-            }}
+            onClick={() => setPendingDelete(r)}
           >
             <Trash2 className="h-4 w-4 text-destructive" />
           </Button>
@@ -98,7 +225,7 @@ function WavePlanningPage() {
         description="BR-150 · Group multiple orders into waves using warehouse, zone, priority, carrier, route and capacity criteria."
         breadcrumbs={[{ label: "Wave Management" }, { label: "Wave Planning" }]}
         actions={
-          <Button disabled={!can("wave.create")} onClick={() => setOpen(true)}>
+          <Button disabled={!can("wave.create")} onClick={openCreate}>
             <Layers className="h-4 w-4" />
             Create Wave
           </Button>
@@ -115,12 +242,13 @@ function WavePlanningPage() {
       <DataTable
         data={rows}
         columns={columns}
+        loading={isLoading}
         searchKeys={(r) => `${r.id} ${r.name} ${r.warehouse} ${r.carrier} ${r.route}`}
         onExport={() => toast.success("Wave report queued")}
         filters={[
           { key: "warehouse", label: "Warehouse", options: warehouses.map((w) => w.code), match: (r, v) => r.warehouse === v },
           { key: "zone", label: "Zone", options: zones, match: (r, v) => r.zone === v },
-          { key: "priority", label: "Priority", options: ["Critical", "High", "Medium", "Low"], match: (r, v) => r.priority === v },
+          { key: "priority", label: "Priority", options: PRIORITIES, match: (r, v) => r.priority === v },
           { key: "carrier", label: "Carrier", options: carriers, match: (r, v) => r.carrier === v },
         ]}
       />
@@ -128,42 +256,44 @@ function WavePlanningPage() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Create Wave</DialogTitle>
+            <DialogTitle>{editing ? `Edit ${editing.id}` : "Create Wave"}</DialogTitle>
             <DialogDescription>Define planning criteria and select the orders to group into this wave.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Wave Name">
-              <Input placeholder="e.g. Morning Metro Wave" />
+              <Input value={form.name} onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))} placeholder="e.g. Morning Metro Wave" />
             </Field>
             <Field label="Wave Number">
-              <Input value={`WV-2026-0${236 + rows.length - waves.length}`} readOnly />
+              <Input value={editing?.id ?? "Auto-generated"} readOnly />
             </Field>
             <Field label="Warehouse">
-              <Picker options={warehouses.map((w) => w.code)} placeholder="Select warehouse" />
+              <Picker options={warehouses.map((w) => w.code)} placeholder="Select warehouse" value={form.warehouse} onChange={(v) => setForm((s) => ({ ...s, warehouse: v }))} />
             </Field>
             <Field label="Zone">
-              <Picker options={zones} placeholder="Select zone" />
+              <Picker options={zones} placeholder="Select zone" value={form.zone} onChange={(v) => setForm((s) => ({ ...s, zone: v }))} />
             </Field>
             <Field label="Priority">
-              <Picker options={["Critical", "High", "Medium", "Low"]} placeholder="Select priority" />
+              <Picker options={PRIORITIES} placeholder="Select priority" value={form.priority} onChange={(v) => setForm((s) => ({ ...s, priority: v as Priority }))} />
             </Field>
             <Field label="Carrier">
-              <Picker options={carriers} placeholder="Select carrier" />
+              <Picker options={carriers} placeholder="Select carrier" value={form.carrier} onChange={(v) => setForm((s) => ({ ...s, carrier: v }))} />
             </Field>
             <Field label="Route">
-              <Picker options={routes} placeholder="Select route" />
+              <Picker options={routes} placeholder="Select route" value={form.route} onChange={(v) => setForm((s) => ({ ...s, route: v }))} />
             </Field>
             <Field label="Delivery Date">
-              <Input type="date" defaultValue="2026-08-05" />
+              <Input type="date" value={form.deliveryDate} onChange={(e) => setForm((s) => ({ ...s, deliveryDate: e.target.value }))} />
             </Field>
             <Field label="Wave Capacity (lines)">
-              <Input type="number" defaultValue={80} />
+              <Input type="number" value={form.capacity} onChange={(e) => setForm((s) => ({ ...s, capacity: e.target.value }))} />
             </Field>
           </div>
 
           <Card className="border-border">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Eligible Orders ({eligible.length})</CardTitle>
+              <CardTitle className="text-sm">
+                Eligible Orders ({eligible.length}) · Selected lines: {computedLines}
+              </CardTitle>
             </CardHeader>
             <CardContent className="max-h-56 space-y-2 overflow-y-auto">
               {eligible.map((o) => (
@@ -186,15 +316,8 @@ function WavePlanningPage() {
             <Button variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button
-              onClick={() => {
-                // TODO(integration): persist wave via the WMS Wave API.
-                setOpen(false);
-                toast.success("Wave created", { description: `${pickedOrders.length} order(s) grouped. Awaiting reservation confirmation.` });
-                setPickedOrders([]);
-              }}
-            >
-              Create Wave
+            <Button onClick={submit} disabled={createMutation.isPending || updateMutation.isPending}>
+              {editing ? "Save Changes" : "Create Wave"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -222,6 +345,26 @@ function WavePlanningPage() {
           </dl>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!pendingDelete} onOpenChange={(v) => !v && setPendingDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {pendingDelete?.id}?</AlertDialogTitle>
+            <AlertDialogDescription>This action cannot be undone. The wave and its association with orders will be removed.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingDelete) deleteMutation.mutate({ id: pendingDelete.id });
+                setPendingDelete(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -244,9 +387,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function Picker({ options, placeholder }: { options: string[]; placeholder: string }) {
+function Picker({ options, placeholder, value, onChange }: { options: string[]; placeholder: string; value: string; onChange: (v: string) => void }) {
   return (
-    <Select>
+    <Select {...(value ? { value } : {})} onValueChange={onChange}>
       <SelectTrigger className="w-full">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>

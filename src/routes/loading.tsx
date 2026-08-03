@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { Truck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -12,7 +14,9 @@ import { PageHeader } from "@/components/wms/page-header";
 import { StatCard } from "@/components/wms/stat-card";
 import { StatusBadge } from "@/components/wms/status-badge";
 import { useRole } from "@/context/role-context";
-import { carriers, docks, shipments, vehicles, type Shipment } from "@/data/mock-data";
+import { referenceQuery, shipmentsQuery, useWmsMutation } from "@/lib/wms-queries";
+import { updateShipmentFn } from "@/lib/wms.functions";
+import { SHIPMENT_STATUSES, type Shipment } from "@/lib/wms-types";
 
 export const Route = createFileRoute("/loading")({
   head: () => ({
@@ -28,7 +32,39 @@ export const Route = createFileRoute("/loading")({
 
 function LoadingPage() {
   const { can } = useRole();
-  const [rows, setRows] = useState<Shipment[]>(shipments);
+  const { data: shipmentsResult } = useQuery(shipmentsQuery());
+  const { data: reference } = useQuery(referenceQuery());
+  const rows: Shipment[] = shipmentsResult?.rows ?? [];
+  const carriers = reference?.carriers ?? [];
+  const docks = reference?.docks ?? [];
+  const vehicles = reference?.vehicles ?? [];
+
+  const [shipmentId, setShipmentId] = useState("");
+  const [vehicle, setVehicle] = useState("");
+  const [driver, setDriver] = useState("");
+  const [carrier, setCarrier] = useState("");
+  const [dock, setDock] = useState("");
+  const [container, setContainer] = useState("");
+  const [seal, setSeal] = useState("");
+
+  const updateFn = useServerFn(updateShipmentFn);
+  const completeLoading = useWmsMutation((args: Parameters<typeof updateFn>[0]["data"]) => updateFn({ data: args }), {
+    success: () => ({ title: "Loading complete", description: "Awaiting load verification." }),
+  });
+  const assignMutation = useWmsMutation((args: Parameters<typeof updateFn>[0]["data"]) => updateFn({ data: args }), {
+    success: (_r, args) => ({ title: `${args.id} load details assigned` }),
+  });
+
+  const assign = () => {
+    if (!shipmentId) {
+      toast.error("Select a shipment to assign");
+      return;
+    }
+    assignMutation.mutate({
+      id: shipmentId,
+      data: { vehicle: vehicle || undefined, driver, carrier: carrier || undefined, dock, container, seal, status: "Loading" },
+    });
+  };
 
   const columns: Column<Shipment>[] = [
     { key: "id", header: "Shipment", value: (r) => r.id, render: (r) => <span className="font-medium text-primary">{r.id}</span> },
@@ -49,11 +85,8 @@ function LoadingPage() {
         <Button
           size="sm"
           variant="outline"
-          disabled={r.status !== "Loading" || !can("load.execute")}
-          onClick={() => {
-            setRows((s) => s.map((x) => (x.id === r.id ? { ...x, status: "Ready for Shipment" } : x)));
-            toast.success(`${r.id} loading complete`, { description: "Awaiting load verification." });
-          }}
+          disabled={r.status !== "Loading" || !can("load.execute") || completeLoading.isPending}
+          onClick={() => completeLoading.mutate({ id: r.id, data: { status: "Ready for Shipment" } })}
         >
           <Truck className="h-4 w-4" />
           Complete Loading
@@ -82,24 +115,33 @@ function LoadingPage() {
           <CardTitle className="text-sm">Assign Load Details</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-3 xl:grid-cols-6">
+          <Field label="Shipment">
+            <Picker options={rows.map((r) => r.id)} value={shipmentId} onChange={setShipmentId} placeholder="Select shipment" />
+          </Field>
           <Field label="Vehicle">
-            <Picker options={vehicles.map((v) => `${v.id} · ${v.plate}`)} placeholder="Select vehicle" />
+            <Picker options={vehicles.map((v) => `${v.id} · ${v.plate}`)} value={vehicle} onChange={(v) => setVehicle(v.split(" · ")[0] ?? v)} placeholder="Select vehicle" />
           </Field>
           <Field label="Driver">
-            <Picker options={[...new Set(rows.map((r) => r.driver))]} placeholder="Select driver" />
+            <Picker options={[...new Set(vehicles.map((v) => v.driver))]} value={driver} onChange={setDriver} placeholder="Select driver" />
           </Field>
           <Field label="Carrier">
-            <Picker options={carriers} placeholder="Select carrier" />
+            <Picker options={carriers} value={carrier} onChange={setCarrier} placeholder="Select carrier" />
           </Field>
           <Field label="Dock">
-            <Picker options={docks} placeholder="Select dock" />
+            <Picker options={docks} value={dock} onChange={setDock} placeholder="Select dock" />
           </Field>
           <Field label="Container Number">
-            <Input placeholder="CNT-88125" />
+            <Input placeholder="CNT-88125" value={container} onChange={(e) => setContainer(e.target.value)} />
           </Field>
           <Field label="Seal Number">
-            <Input placeholder="SEAL-441214" />
+            <Input placeholder="SEAL-441214" value={seal} onChange={(e) => setSeal(e.target.value)} />
           </Field>
+          <div className="flex items-end xl:col-span-6">
+            <Button disabled={assignMutation.isPending} onClick={assign}>
+              <Truck className="h-4 w-4" />
+              Assign Load
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -111,7 +153,7 @@ function LoadingPage() {
         filters={[
           { key: "carrier", label: "Carrier", options: carriers, match: (r, v) => r.carrier === v },
           { key: "dock", label: "Dock", options: docks, match: (r, v) => r.dock === v },
-          { key: "status", label: "Status", options: ["Staged", "Loading", "Ready for Shipment", "In Transit", "Delivered"], match: (r, v) => r.status === v },
+          { key: "status", label: "Status", options: [...SHIPMENT_STATUSES], match: (r, v) => r.status === v },
         ]}
       />
     </div>
@@ -127,9 +169,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function Picker({ options, placeholder }: { options: string[]; placeholder: string }) {
+function Picker({ options, value, onChange, placeholder }: { options: string[]; value: string; onChange: (v: string) => void; placeholder: string }) {
   return (
-    <Select>
+    <Select value={value} onValueChange={onChange}>
       <SelectTrigger className="w-full">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
