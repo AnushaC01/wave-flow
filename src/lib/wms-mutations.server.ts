@@ -259,3 +259,8 @@ export async function setSetting(key: string, value: unknown) {
   if (error) fail(error);
   return true;
 }
+
+/* ---------------------------- shipment tracking --------------------------- */
+
+export const setShipmentStatus = (id: string, status: string, actor: string) =>
+  rpc<string>("set_shipment_status", { p_id: id, p_status: status, p_actor: actor });

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { Download, FileBarChart } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -22,15 +23,9 @@ import { DataTable, type Column } from "@/components/wms/data-table";
 import { PageHeader } from "@/components/wms/page-header";
 import { StatCard } from "@/components/wms/stat-card";
 import { StatusBadge } from "@/components/wms/status-badge";
-import {
-  dailyFulfillmentChart,
-  ordersByPriorityChart,
-  salesOrders,
-  shipmentTrendChart,
-  waveStatusChart,
-  waves,
-  type Wave,
-} from "@/data/mock-data";
+import { downloadCsv } from "@/lib/csv";
+import { dashboardQuery, ordersQuery, wavesQuery } from "@/lib/wms-queries";
+import type { Wave } from "@/lib/wms-types";
 
 export const Route = createFileRoute("/reports")({
   head: () => ({
@@ -47,6 +42,12 @@ export const Route = createFileRoute("/reports")({
 const PIE_COLORS = ["var(--color-chart-1)", "var(--color-chart-2)", "var(--color-chart-3)", "var(--color-chart-4)", "var(--color-chart-5)"];
 
 function ReportsPage() {
+  const { data: stats } = useQuery(dashboardQuery());
+  const { data: wavesResult, isLoading } = useQuery(wavesQuery());
+  const { data: ordersResult } = useQuery(ordersQuery());
+  const waves: Wave[] = wavesResult?.rows ?? [];
+  const orders = ordersResult?.rows ?? [];
+
   const columns: Column<Wave>[] = [
     { key: "id", header: "Wave", value: (r) => r.id, render: (r) => <span className="font-medium text-primary">{r.id}</span> },
     { key: "name", header: "Wave Name", value: (r) => r.name },
@@ -58,8 +59,29 @@ function ReportsPage() {
     { key: "status", header: "Status", value: (r) => r.status, render: (r) => <StatusBadge value={r.status} /> },
   ];
 
-  const shipped = salesOrders.filter((o) => o.status === "Shipped").length;
-  const onTime = Math.round((shipped / Math.max(salesOrders.length, 1)) * 100);
+  const shipped = orders.filter((o) => o.status === "Shipped").length;
+  const fulfilmentRate = stats?.fulfilmentRate ?? 0;
+
+  const exportCsv = () => {
+    const ok = downloadCsv(
+      "outbound-summary",
+      orders.map((o) => ({
+        order: o.id,
+        customer: o.customer,
+        orderDate: o.orderDate,
+        deliveryDate: o.deliveryDate,
+        priority: o.priority,
+        warehouse: o.warehouse,
+        carrier: o.carrier,
+        items: o.items,
+        quantity: o.quantity,
+        valueUsd: o.valueUsd,
+        validation: o.validation,
+        status: o.status,
+      })),
+    );
+    toast[ok ? "success" : "info"](ok ? "CSV export started" : "Nothing to export");
+  };
 
   return (
     <div>
@@ -73,7 +95,7 @@ function ReportsPage() {
               <FileBarChart className="h-4 w-4" />
               Export PDF
             </Button>
-            <Button onClick={() => toast.success("CSV export started")}>
+            <Button onClick={exportCsv}>
               <Download className="h-4 w-4" />
               Export CSV
             </Button>
@@ -82,18 +104,18 @@ function ReportsPage() {
       />
 
       <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Orders Processed" value={salesOrders.length} tone="primary" />
-        <StatCard label="Orders Shipped" value={shipped} tone="success" trend={{ value: "+8.2%", direction: "up" }} />
-        <StatCard label="Fulfillment Rate" value={`${onTime}%`} tone="warning" />
+        <StatCard label="Orders Processed" value={stats?.totalOrders ?? orders.length} tone="primary" />
+        <StatCard label="Orders Shipped" value={shipped} tone="success" />
+        <StatCard label="Fulfillment Rate" value={`${fulfilmentRate}%`} tone="warning" />
         <StatCard label="Active Waves" value={waves.filter((w) => w.status !== "Completed").length} />
       </div>
 
       <div className="mb-4 grid gap-4 xl:grid-cols-2">
         <ChartCard title="Daily Fulfillment Throughput">
           <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={dailyFulfillmentChart}>
+            <BarChart data={stats?.dailyFulfillmentChart ?? []}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-              <XAxis dataKey="day" tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" />
+              <XAxis dataKey="hour" tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" />
               <YAxis tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" />
               <Tooltip contentStyle={{ background: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 8, fontSize: 12 }} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
@@ -106,13 +128,13 @@ function ReportsPage() {
 
         <ChartCard title="Shipment Trend">
           <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={shipmentTrendChart}>
+            <LineChart data={stats?.shipmentTrendChart ?? []}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-              <XAxis dataKey="date" tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" />
+              <XAxis dataKey="day" tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" />
               <YAxis tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" />
               <Tooltip contentStyle={{ background: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 8, fontSize: 12 }} />
-              <Line type="monotone" dataKey="shipments" stroke="var(--color-chart-1)" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="onTime" stroke="var(--color-chart-2)" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="shipped" stroke="var(--color-chart-1)" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="planned" stroke="var(--color-chart-2)" strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -120,8 +142,8 @@ function ReportsPage() {
         <ChartCard title="Wave Status Distribution">
           <ResponsiveContainer width="100%" height={260}>
             <PieChart>
-              <Pie data={waveStatusChart} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={2}>
-                {waveStatusChart.map((_, i) => (
+              <Pie data={stats?.waveStatusChart ?? []} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={2}>
+                {(stats?.waveStatusChart ?? []).map((_, i) => (
                   <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                 ))}
               </Pie>
@@ -133,12 +155,12 @@ function ReportsPage() {
 
         <ChartCard title="Orders by Priority">
           <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={ordersByPriorityChart} layout="vertical">
+            <BarChart data={stats?.ordersByPriorityChart ?? []} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" horizontal={false} />
               <XAxis type="number" tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" />
-              <YAxis type="category" dataKey="name" width={70} tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" />
+              <YAxis type="category" dataKey="priority" width={70} tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" />
               <Tooltip contentStyle={{ background: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 8, fontSize: 12 }} />
-              <Bar dataKey="value" fill="var(--color-chart-4)" radius={[0, 4, 4, 0]} />
+              <Bar dataKey="orders" fill="var(--color-chart-4)" radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -147,8 +169,30 @@ function ReportsPage() {
       <DataTable
         data={waves}
         columns={columns}
+        loading={isLoading}
         searchKeys={(r) => `${r.id} ${r.name} ${r.warehouse}`}
-        onExport={() => toast.success("Wave performance exported")}
+        filters={[
+          { key: "status", label: "Status", options: ["Draft", "Planned", "Released", "Picking", "Completed"], match: (r, v) => r.status === v },
+          { key: "warehouse", label: "Warehouse", options: [...new Set(waves.map((w) => w.warehouse))], match: (r, v) => r.warehouse === v },
+        ]}
+        onExport={() => {
+          const ok = downloadCsv(
+            "wave-performance",
+            waves.map((w) => ({
+              wave: w.id,
+              name: w.name,
+              warehouse: w.warehouse,
+              zone: w.zone,
+              orders: w.orders.length,
+              lines: w.lines,
+              capacity: w.capacity,
+              carrier: w.carrier,
+              route: w.route,
+              status: w.status,
+            })),
+          );
+          toast[ok ? "success" : "info"](ok ? "Wave performance exported" : "Nothing to export");
+        }}
       />
     </div>
   );

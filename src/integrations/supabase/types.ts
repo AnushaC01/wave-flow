@@ -881,6 +881,10 @@ export type Database = {
         Args: { p_action: string; p_id: string }
         Returns: Json
       }
+      set_shipment_status: {
+        Args: { p_actor?: string; p_id: string; p_status: string }
+        Returns: string
+      }
       update_sales_order: { Args: { p: Json; p_id: string }; Returns: string }
       update_shipment: { Args: { p: Json; p_id: string }; Returns: string }
       update_wave: { Args: { p: Json; p_id: string }; Returns: string }
