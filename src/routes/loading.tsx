@@ -48,12 +48,14 @@ function LoadingPage() {
   const [seal, setSeal] = useState("");
 
   const updateFn = useServerFn(updateShipmentFn);
-  const completeLoading = useWmsMutation((args: Parameters<typeof updateFn>[0]["data"]) => updateFn({ data: args }), {
-    success: () => ({ title: "Loading complete", description: "Awaiting load verification." }),
-  });
-  const assignMutation = useWmsMutation((args: Parameters<typeof updateFn>[0]["data"]) => updateFn({ data: args }), {
-    success: (_r, args) => ({ title: `${args.id} load details assigned` }),
-  });
+  const completeLoading = useWmsMutation(
+    (args: { id: string; data: Record<string, unknown> }) => updateFn({ data: args as never }),
+    { success: () => ({ title: "Loading complete", description: "Awaiting load verification." }) },
+  );
+  const assignMutation = useWmsMutation(
+    (args: { id: string; data: Record<string, unknown> }) => updateFn({ data: args as never }),
+    { success: (_r, args) => ({ title: `${args.id} load details assigned` }) },
+  );
 
   const assign = () => {
     if (!shipmentId) {
