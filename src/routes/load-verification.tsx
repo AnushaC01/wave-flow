@@ -56,8 +56,9 @@ function LoadVerificationPage() {
   const verifyMutation = useWmsMutation(
     (args: { id: string; checklist: string[]; actor: string }) => verifyFn({ data: args as never }),
     {
-    success: (_r, args) => ({ title: `${args.id} load verified`, description: "Shipment can now be sent for dispatch approval." }),
-  });
+      success: (_r, args) => ({ title: `${args.id} load verified`, description: "Shipment can now be sent for dispatch approval." }),
+    },
+  );
 
   const verify = () => {
     if (!selected) return;
