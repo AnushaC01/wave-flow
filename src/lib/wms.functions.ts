@@ -39,6 +39,7 @@ import {
   resolveBackorder,
   setOrderStatus,
   setSetting,
+  setShipmentStatus,
   updateOrder,
   updatePickLine,
   updateShipment,
@@ -244,6 +245,18 @@ export const authorizeDispatchFn = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(({ data }) => authorizeDispatch(data.id, data.approve, data.role, data.actor));
+
+export const setShipmentStatusFn = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        id: z.string().min(1),
+        status: z.enum(["Staged", "Loading", "Ready for Shipment", "In Transit", "Delivered"]),
+        actor: z.string().max(80).default("System"),
+      })
+      .parse(d),
+  )
+  .handler(({ data }) => setShipmentStatus(data.id, data.status, data.actor));
 
 /* ------------------------------- backorders ------------------------------- */
 
