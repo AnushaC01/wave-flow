@@ -53,7 +53,9 @@ function LoadVerificationPage() {
     setChecked((s) => (s.includes(c) ? s.filter((x) => x !== c) : [...s, c]));
 
   const verifyFn = useServerFn(verifyLoadFn);
-  const verifyMutation = useWmsMutation((args: Parameters<typeof verifyFn>[0]["data"]) => verifyFn({ data: args }), {
+  const verifyMutation = useWmsMutation(
+    (args: { id: string; checklist: string[]; actor: string }) => verifyFn({ data: args as never }),
+    {
     success: (_r, args) => ({ title: `${args.id} load verified`, description: "Shipment can now be sent for dispatch approval." }),
   });
 
