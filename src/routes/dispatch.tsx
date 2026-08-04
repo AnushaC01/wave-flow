@@ -1,5 +1,6 @@
-import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -9,7 +10,10 @@ import { PageHeader } from "@/components/wms/page-header";
 import { StatCard } from "@/components/wms/stat-card";
 import { StatusBadge } from "@/components/wms/status-badge";
 import { useRole } from "@/context/role-context";
-import { carriers, shipments, type Shipment } from "@/data/mock-data";
+import { downloadCsv } from "@/lib/csv";
+import { referenceQuery, shipmentsQuery, useWmsMutation } from "@/lib/wms-queries";
+import { authorizeDispatchFn } from "@/lib/wms.functions";
+import type { Shipment } from "@/lib/wms-types";
 
 export const Route = createFileRoute("/dispatch")({
   head: () => ({
@@ -25,8 +29,22 @@ export const Route = createFileRoute("/dispatch")({
 
 function DispatchPage() {
   const { can, role } = useRole();
-  const [rows, setRows] = useState<Shipment[]>(shipments);
+  const { data: shipmentsResult, isLoading } = useQuery(shipmentsQuery());
+  const { data: reference } = useQuery(referenceQuery());
+  const rows: Shipment[] = shipmentsResult?.rows ?? [];
+  const carriers = reference?.carriers ?? [];
   const isManager = role === "Warehouse Manager" || role === "Administrator";
+
+  const authorizeFn = useServerFn(authorizeDispatchFn);
+  const decideMutation = useWmsMutation(
+    (args: { id: string; approve: boolean; role: string; actor: string }) => authorizeFn({ data: args as never }),
+    {
+      success: (_r, args) => ({
+        title: args.approve ? `${args.id} dispatched` : `${args.id} dispatch rejected`,
+        description: args.approve ? "Linked orders marked as shipped." : "Shipment returned to the loading team.",
+      }),
+    },
+  );
 
   const decide = (r: Shipment, approve: boolean) => {
     if (!isManager) {
@@ -37,14 +55,7 @@ function DispatchPage() {
       toast.error("Dispatch blocked", { description: `${r.id} has not passed load verification (BR-156).` });
       return;
     }
-    setRows((s) =>
-      s.map((x) =>
-        x.id === r.id
-          ? { ...x, dispatch: approve ? "Dispatched" : "Rejected", status: approve ? "In Transit" : x.status }
-          : x,
-      ),
-    );
-    toast[approve ? "success" : "warning"](approve ? `${r.id} dispatched` : `${r.id} dispatch rejected`);
+    decideMutation.mutate({ id: r.id, approve, role, actor: role });
   };
 
   const columns: Column<Shipment>[] = [
@@ -67,11 +78,15 @@ function DispatchPage() {
       sortable: false,
       render: (r) => (
         <div className="flex gap-2">
-          <Button size="sm" disabled={!can("shipment.track") && !isManager} onClick={() => decide(r, true)}>
+          <Button
+            size="sm"
+            disabled={(!can("shipment.track") && !isManager) || r.dispatch === "Dispatched" || decideMutation.isPending}
+            onClick={() => decide(r, true)}
+          >
             <CheckCircle2 className="h-4 w-4" />
             Approve
           </Button>
-          <Button size="sm" variant="outline" onClick={() => decide(r, false)}>
+          <Button size="sm" variant="outline" disabled={r.dispatch === "Dispatched" || decideMutation.isPending} onClick={() => decide(r, false)}>
             <XCircle className="h-4 w-4" />
             Reject
           </Button>
@@ -108,11 +123,34 @@ function DispatchPage() {
       <DataTable
         data={rows}
         columns={columns}
+        loading={isLoading}
         searchKeys={(r) => `${r.id} ${r.carrier} ${r.driver} ${r.destination}`}
-        onExport={() => toast.success("Dispatch log exported")}
+        onExport={() =>
+          downloadCsv(
+            "dispatch-log",
+            rows.map((r) => ({
+              shipment: r.id,
+              orders: r.orders.join(" | "),
+              carrier: r.carrier,
+              vehicle: r.vehicle,
+              driver: r.driver,
+              destination: r.destination,
+              loadVerified: r.loadVerified,
+              dispatch: r.dispatch,
+              status: r.status,
+            })),
+          )
+            ? toast.success("Dispatch log exported")
+            : toast.info("Nothing to export")
+        }
         filters={[
           { key: "carrier", label: "Carrier", options: carriers, match: (r, v) => r.carrier === v },
-          { key: "dispatch", label: "Dispatch Status", options: ["Awaiting Dispatch", "Approved", "Rejected", "Dispatched"], match: (r, v) => r.dispatch === v },
+          {
+            key: "dispatch",
+            label: "Dispatch Status",
+            options: ["Awaiting Dispatch", "Approved", "Rejected", "Dispatched"],
+            match: (r, v) => r.dispatch === v,
+          },
         ]}
       />
     </div>
