@@ -1,12 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { MapPin, Truck } from "lucide-react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/wms/data-table";
 import { PageHeader } from "@/components/wms/page-header";
 import { StatCard } from "@/components/wms/stat-card";
 import { StatusBadge } from "@/components/wms/status-badge";
-import { carriers, shipments, type Shipment } from "@/data/mock-data";
+import { useRole } from "@/context/role-context";
+import { downloadCsv } from "@/lib/csv";
+import { referenceQuery, shipmentsQuery, useWmsMutation } from "@/lib/wms-queries";
+import { setShipmentStatusFn } from "@/lib/wms.functions";
+import type { Shipment } from "@/lib/wms-types";
 
 export const Route = createFileRoute("/shipping")({
   head: () => ({
@@ -23,6 +30,18 @@ export const Route = createFileRoute("/shipping")({
 const TIMELINE = ["Staged", "Loading", "Ready for Shipment", "In Transit", "Delivered"] as const;
 
 function ShippingPage() {
+  const { role } = useRole();
+  const { data: shipmentsResult, isLoading } = useQuery(shipmentsQuery());
+  const { data: reference } = useQuery(referenceQuery());
+  const shipments: Shipment[] = shipmentsResult?.rows ?? [];
+  const carriers = reference?.carriers ?? [];
+
+  const statusFn = useServerFn(setShipmentStatusFn);
+  const statusMutation = useWmsMutation(
+    (args: { id: string; status: (typeof TIMELINE)[number]; actor: string }) => statusFn({ data: args as never }),
+    { success: (_r, args) => ({ title: `${args.id} — ${args.status}`, description: "Tracking status updated." }) },
+  );
+
   const columns: Column<Shipment>[] = [
     { key: "id", header: "Shipment", value: (r) => r.id, render: (r) => <span className="font-medium text-primary">{r.id}</span> },
     { key: "trackingNo", header: "Tracking Number", value: (r) => r.trackingNo, className: "num" },
@@ -33,6 +52,31 @@ function ShippingPage() {
     { key: "scheduledAt", header: "Scheduled", value: (r) => r.scheduledAt, className: "num" },
     { key: "dispatch", header: "Dispatch", value: (r) => r.dispatch, render: (r) => <StatusBadge value={r.dispatch} /> },
     { key: "status", header: "Shipment Status", value: (r) => r.status, render: (r) => <StatusBadge value={r.status} /> },
+    {
+      key: "actions",
+      header: "Actions",
+      sortable: false,
+      render: (r) => (
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={statusMutation.isPending || r.status === "In Transit" || r.status === "Delivered"}
+            onClick={() => statusMutation.mutate({ id: r.id, status: "In Transit", actor: role })}
+          >
+            In Transit
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={statusMutation.isPending || r.status === "Delivered"}
+            onClick={() => statusMutation.mutate({ id: r.id, status: "Delivered", actor: role })}
+          >
+            Delivered
+          </Button>
+        </div>
+      ),
+    },
   ];
 
   return (
@@ -56,7 +100,7 @@ function ShippingPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {shipments.map((s) => {
-            const idx = TIMELINE.indexOf(s.status);
+            const idx = TIMELINE.indexOf(s.status as (typeof TIMELINE)[number]);
             return (
               <div key={s.id} className="grid gap-2 border-b border-border pb-3 last:border-0 last:pb-0 sm:grid-cols-[200px_1fr]">
                 <div className="min-w-0">
@@ -89,8 +133,26 @@ function ShippingPage() {
       <DataTable
         data={shipments}
         columns={columns}
+        loading={isLoading}
         searchKeys={(r) => `${r.id} ${r.trackingNo} ${r.carrier} ${r.destination} ${r.orders.join(" ")}`}
-        onExport={() => toast.success("Shipping report exported")}
+        onExport={() =>
+          downloadCsv(
+            "shipping-report",
+            shipments.map((s) => ({
+              shipment: s.id,
+              tracking: s.trackingNo,
+              carrier: s.carrier,
+              orders: s.orders.join(" | "),
+              destination: s.destination,
+              driver: s.driver,
+              scheduled: s.scheduledAt,
+              dispatch: s.dispatch,
+              status: s.status,
+            })),
+          )
+            ? toast.success("Shipping report exported")
+            : toast.info("Nothing to export")
+        }
         filters={[
           { key: "carrier", label: "Carrier", options: carriers, match: (r, v) => r.carrier === v },
           { key: "status", label: "Status", options: [...TIMELINE], match: (r, v) => r.status === v },
