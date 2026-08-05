@@ -174,7 +174,7 @@ const mapWave = (r: any): Wave => ({
 
 const mapPick = (r: any): PickLine => ({
   id: r.id,
-  wave: r.wave_id,
+  wave: r.wave_id ?? "",
   picker: r.picker,
   zone: r.zone,
   location: r.location,
@@ -506,4 +506,59 @@ export async function getDashboard(): Promise<DashboardStats> {
     orderStatusChart: [...statusMap.entries()].map(([status, orders]) => ({ status, orders })),
     carrierChart: [...carrierMap.entries()].map(([carrier, shipments]) => ({ carrier, shipments })),
   };
+}
+
+/* --------------------- manual pick list eligible orders -------------------- */
+
+export interface PickableOrder {
+  id: string;
+  customer: string;
+  warehouse: string;
+  priority: string;
+  deliveryDate: string;
+  lines: number;
+  units: number;
+}
+
+/**
+ * Orders eligible for manual (wave-less) pick list creation — BR-151 Workflow B.
+ * Validated, fully allocated/reserved, not on an active wave, no existing pick list.
+ */
+export async function listPickableOrders(): Promise<PickableOrder[]> {
+  const client = db();
+  const [ordersRes, waveRes, pickRes] = await Promise.all([
+    client
+      .from("sales_orders")
+      .select("id, customer, warehouse, priority, delivery_date, status, validation, order_lines(quantity, allocated)")
+      .eq("validation", "Passed")
+      .in("status", ["Allocated", "Reserved"]),
+    client.from("wave_orders").select("order_id, waves(status)"),
+    client.from("pick_lines").select("order_id").not("order_id", "is", null),
+  ]);
+  const err = [ordersRes, waveRes, pickRes].find((r) => r.error);
+  if (err?.error) fail(err.error);
+
+  const waved = new Set(
+    (waveRes.data ?? [])
+      .filter((w: any) => (w.waves?.status ?? "") !== "Completed")
+      .map((w: any) => w.order_id as string),
+  );
+  const picked = new Set((pickRes.data ?? []).map((p: any) => p.order_id as string));
+
+  return (ordersRes.data ?? [])
+    .filter((o: any) => {
+      const lines = o.order_lines ?? [];
+      if (lines.length === 0) return false;
+      if (waved.has(o.id) || picked.has(o.id)) return false;
+      return lines.every((l: any) => l.allocated >= l.quantity);
+    })
+    .map((o: any) => ({
+      id: o.id,
+      customer: o.customer,
+      warehouse: o.warehouse,
+      priority: o.priority,
+      deliveryDate: o.delivery_date,
+      lines: (o.order_lines ?? []).length,
+      units: (o.order_lines ?? []).reduce((s: number, l: any) => s + l.quantity, 0),
+    }));
 }

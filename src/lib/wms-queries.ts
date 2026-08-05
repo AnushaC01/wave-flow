@@ -13,6 +13,7 @@ import {
   fetchOrders,
   fetchPacking,
   fetchPickLines,
+  fetchPickableOrders,
   fetchReference,
   fetchSettings,
   fetchShipments,
@@ -37,6 +38,9 @@ export const shipmentsQuery = (p: ListParams = ALL) =>
 export const backordersQuery = (p: ListParams = ALL) =>
   queryOptions({ queryKey: ["backorders", p], queryFn: () => fetchBackorders({ data: p }) });
 
+export const pickableOrdersQuery = () =>
+  queryOptions({ queryKey: ["pickableOrders"], queryFn: () => fetchPickableOrders() });
+
 export const referenceQuery = () =>
   queryOptions({ queryKey: ["reference"], queryFn: () => fetchReference(), staleTime: 5 * 60_000 });
 export const dashboardQuery = () => queryOptions({ queryKey: ["dashboard"], queryFn: () => fetchDashboard() });
@@ -53,6 +57,7 @@ export const WORKFLOW_KEYS = [
   "packing",
   "shipments",
   "backorders",
+  "pickableOrders",
   "dashboard",
   "activity",
   "notifications",

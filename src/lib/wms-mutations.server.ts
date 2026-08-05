@@ -264,3 +264,10 @@ export async function setSetting(key: string, value: unknown) {
 
 export const setShipmentStatus = (id: string, status: string, actor: string) =>
   rpc<string>("set_shipment_status", { p_id: id, p_status: status, p_actor: actor });
+
+/* -------------------- manual pick lists (BR-151 workflow B) ----------------- */
+
+export const createManualPickList = (order: string, actor: string) =>
+  rpc<{ order: string; lines: number }>("create_manual_pick_list", { p_order: order, p_actor: actor });
+
+export const completeOrderPicking = (order: string) => rpc<string>("complete_order_picking", { p_order: order });

@@ -2,17 +2,26 @@ import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, FileText, Printer, RefreshCw } from "lucide-react";
+import { Download, FileText, Plus, Printer, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DataTable, type Column } from "@/components/wms/data-table";
 import { PageHeader } from "@/components/wms/page-header";
 import { StatCard } from "@/components/wms/stat-card";
 import { StatusBadge } from "@/components/wms/status-badge";
 import { useRole } from "@/context/role-context";
-import { errorMessage, pickLinesQuery, referenceQuery, WORKFLOW_KEYS, wavesQuery } from "@/lib/wms-queries";
-import { generatePickListsFn } from "@/lib/wms.functions";
+import {
+  errorMessage,
+  pickableOrdersQuery,
+  pickLinesQuery,
+  referenceQuery,
+  WORKFLOW_KEYS,
+  wavesQuery,
+} from "@/lib/wms-queries";
+import { createManualPickListFn, generatePickListsFn } from "@/lib/wms.functions";
 import type { PickLine } from "@/lib/wms-types";
 
 export const Route = createFileRoute("/pick-lists")({
@@ -51,18 +60,28 @@ function downloadCsv(rows: PickLine[]) {
 }
 
 function PickListsPage() {
-  const { can } = useRole();
+  const { can, role } = useRole();
   const { data: pickLinesResult, isLoading } = useQuery(pickLinesQuery());
   const { data: wavesResult } = useQuery(wavesQuery());
   const { data: reference } = useQuery(referenceQuery());
+  const { data: pickableOrders } = useQuery(pickableOrdersQuery());
   const pickLines: PickLine[] = pickLinesResult?.rows ?? [];
   const waves = wavesResult?.rows ?? [];
   const zones = reference?.zones ?? [];
   const releasedWaves = waves.filter((w) => ["Released", "Picking", "Completed"].includes(w.status));
+  const eligibleOrders = pickableOrders ?? [];
 
   const generateServerFn = useServerFn(generatePickListsFn);
+  const manualServerFn = useServerFn(createManualPickListFn);
   const queryClient = useQueryClient();
   const [generating, setGenerating] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualOrder, setManualOrder] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  const refreshWorkflow = () => {
+    for (const key of WORKFLOW_KEYS) void queryClient.invalidateQueries({ queryKey: [key] });
+  };
 
   const generate = async () => {
     const targets = waves.filter((w) => w.status === "Released");
@@ -74,7 +93,7 @@ function PickListsPage() {
     try {
       const results = await Promise.all(targets.map((w) => generateServerFn({ data: { wave: w.id } })));
       const total = results.reduce((s: number, r) => s + (typeof r === "number" ? r : 0), 0);
-      for (const key of WORKFLOW_KEYS) void queryClient.invalidateQueries({ queryKey: [key] });
+      refreshWorkflow();
       toast.success("Pick lists generated", { description: `${total} pick lines across ${targets.length} released wave(s).` });
     } catch (err) {
       toast.error("Pick list generation failed", { description: errorMessage(err) });
@@ -83,9 +102,30 @@ function PickListsPage() {
     }
   };
 
+  const createManual = async () => {
+    if (!manualOrder) {
+      toast.error("Select an order", { description: "Choose an eligible sales order to create a pick list." });
+      return;
+    }
+    setCreating(true);
+    try {
+      const result = await manualServerFn({ data: { order: manualOrder, actor: role } });
+      refreshWorkflow();
+      toast.success("Pick list created", {
+        description: `${result.lines} pick line(s) created for ${result.order} — order is Ready for Picking.`,
+      });
+      setManualOpen(false);
+      setManualOrder("");
+    } catch (err) {
+      toast.error("Manual pick list creation failed", { description: errorMessage(err) });
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const columns: Column<PickLine>[] = [
     { key: "id", header: "Pick Line", value: (r) => r.id, render: (r) => <span className="font-medium text-primary">{r.id}</span> },
-    { key: "wave", header: "Wave Number", value: (r) => r.wave },
+    { key: "wave", header: "Wave Number", value: (r) => r.wave || "None" },
     { key: "picker", header: "Picker", value: (r) => r.picker },
     { key: "zone", header: "Warehouse Zone", value: (r) => r.zone },
     { key: "location", header: "Storage Location", value: (r) => r.location },
@@ -117,6 +157,10 @@ function PickListsPage() {
               <Download className="h-4 w-4" />
               Download
             </Button>
+            <Button variant="outline" disabled={!can("picklist.generate")} onClick={() => setManualOpen(true)}>
+              <Plus className="h-4 w-4" />
+              Create Pick List
+            </Button>
             <Button disabled={!can("picklist.generate") || generating} onClick={generate}>
               <RefreshCw className="h-4 w-4" />
               Generate
@@ -124,6 +168,47 @@ function PickListsPage() {
           </>
         }
       />
+
+      <Dialog open={manualOpen} onOpenChange={setManualOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Pick List</DialogTitle>
+            <DialogDescription>
+              Manual pick list for a single sales order that is not assigned to any wave. Only validated, allocated and reserved orders
+              without an existing pick list are listed.
+            </DialogDescription>
+          </DialogHeader>
+          {eligibleOrders.length === 0 ? (
+            <Alert className="border-warning/30 bg-warning-soft">
+              <AlertTitle className="text-sm">No eligible orders</AlertTitle>
+              <AlertDescription className="text-xs text-muted-foreground">
+                An order must be validated, fully allocated and reserved, not assigned to a wave, and have no existing pick list.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <Select value={manualOrder} onValueChange={setManualOrder}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select sales order" />
+              </SelectTrigger>
+              <SelectContent>
+                {eligibleOrders.map((o) => (
+                  <SelectItem key={o.id} value={o.id}>
+                    {o.id} · {o.customer} · {o.lines} line(s) / {o.units} units
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setManualOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={createManual} disabled={creating || eligibleOrders.length === 0}>
+              Generate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Alert className="mb-4 border-info/20 bg-info-soft">
         <AlertTitle>Released waves eligible for pick list generation</AlertTitle>
@@ -150,7 +235,12 @@ function PickListsPage() {
           toast.success("CSV export queued");
         }}
         filters={[
-          { key: "wave", label: "Wave", options: releasedWaves.map((w) => w.id), match: (r, v) => r.wave === v },
+          {
+            key: "wave",
+            label: "Wave",
+            options: ["None", ...releasedWaves.map((w) => w.id)],
+            match: (r, v) => (v === "None" ? !r.wave : r.wave === v),
+          },
           { key: "zone", label: "Zone", options: zones, match: (r, v) => r.zone === v },
           { key: "status", label: "Status", options: ["Pending", "In Progress", "Picked", "Short"], match: (r, v) => r.status === v },
         ]}

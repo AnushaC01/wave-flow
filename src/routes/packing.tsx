@@ -68,7 +68,7 @@ function PackingPage() {
   const submitNewPackage = () => {
     const parsed = packingInput.safeParse({
       order: form.order,
-      wave: form.wave || undefined,
+      wave: form.wave && form.wave !== "__none__" ? form.wave : null,
       packageType: form.packageType,
       carton: form.carton,
       weightKg: Number(form.weightKg || 0),
@@ -91,7 +91,7 @@ function PackingPage() {
   const columns: Column<PackingRecord>[] = [
     { key: "id", header: "Packing ID", value: (r) => r.id, render: (r) => <span className="font-medium text-primary">{r.id}</span> },
     { key: "order", header: "Sales Order", value: (r) => r.order },
-    { key: "wave", header: "Wave", value: (r) => r.wave },
+    { key: "wave", header: "Wave", value: (r) => r.wave || "None" },
     { key: "packageType", header: "Package Type", value: (r) => r.packageType },
     { key: "carton", header: "Carton", value: (r) => r.carton },
     { key: "weightKg", header: "Weight (kg)", value: (r) => r.weightKg, className: "num text-right" },
@@ -113,7 +113,7 @@ function PackingPage() {
             completeMutation.mutate({
               id: r.id,
               order: r.order,
-              wave: r.wave || undefined,
+              wave: r.wave || null,
               packageType: r.packageType,
               carton: r.carton,
               weightKg: r.weightKg,
@@ -183,9 +183,10 @@ function PackingPage() {
             <Field label="Wave">
               <Select value={form.wave} onValueChange={(v) => set("wave", v)}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select wave" />
+                  <SelectValue placeholder="None" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="__none__">None</SelectItem>
                   {waves.map((w) => (
                     <SelectItem key={w.id} value={w.id}>
                       {w.id}
