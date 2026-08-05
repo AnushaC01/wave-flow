@@ -398,6 +398,7 @@ export type Database = {
           created_at: string
           id: string
           location: string
+          order_id: string | null
           picked_qty: number
           picker: string
           product: string
@@ -407,7 +408,7 @@ export type Database = {
           status: string
           updated_at: string
           verified: boolean
-          wave_id: string
+          wave_id: string | null
           zone: string
         }
         Insert: {
@@ -415,6 +416,7 @@ export type Database = {
           created_at?: string
           id: string
           location?: string
+          order_id?: string | null
           picked_qty?: number
           picker?: string
           product?: string
@@ -424,7 +426,7 @@ export type Database = {
           status?: string
           updated_at?: string
           verified?: boolean
-          wave_id: string
+          wave_id?: string | null
           zone?: string
         }
         Update: {
@@ -432,6 +434,7 @@ export type Database = {
           created_at?: string
           id?: string
           location?: string
+          order_id?: string | null
           picked_qty?: number
           picker?: string
           product?: string
@@ -441,10 +444,17 @@ export type Database = {
           status?: string
           updated_at?: string
           verified?: boolean
-          wave_id?: string
+          wave_id?: string | null
           zone?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "pick_lines_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "sales_orders"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "pick_lines_sku_fkey"
             columns: ["sku"]
@@ -852,6 +862,7 @@ export type Database = {
         }
         Returns: string
       }
+      complete_order_picking: { Args: { p_order: string }; Returns: string }
       confirm_pick: {
         Args: {
           p_barcode: string
@@ -862,6 +873,10 @@ export type Database = {
         Returns: Json
       }
       confirm_wave_reservation: { Args: { p_id: string }; Returns: boolean }
+      create_manual_pick_list: {
+        Args: { p_actor?: string; p_order: string }
+        Returns: Json
+      }
       create_sales_order: { Args: { p: Json }; Returns: string }
       create_shipment: { Args: { p: Json }; Returns: string }
       create_wave: { Args: { p: Json }; Returns: string }
