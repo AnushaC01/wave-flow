@@ -157,6 +157,10 @@ function PickListsPage() {
               <Download className="h-4 w-4" />
               Download
             </Button>
+            <Button variant="outline" disabled={!can("picklist.generate")} onClick={() => setManualOpen(true)}>
+              <Plus className="h-4 w-4" />
+              Create Pick List
+            </Button>
             <Button disabled={!can("picklist.generate") || generating} onClick={generate}>
               <RefreshCw className="h-4 w-4" />
               Generate
@@ -164,6 +168,47 @@ function PickListsPage() {
           </>
         }
       />
+
+      <Dialog open={manualOpen} onOpenChange={setManualOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Pick List</DialogTitle>
+            <DialogDescription>
+              Manual pick list for a single sales order that is not assigned to any wave. Only validated, allocated and reserved orders
+              without an existing pick list are listed.
+            </DialogDescription>
+          </DialogHeader>
+          {eligibleOrders.length === 0 ? (
+            <Alert className="border-warning/30 bg-warning-soft">
+              <AlertTitle className="text-sm">No eligible orders</AlertTitle>
+              <AlertDescription className="text-xs text-muted-foreground">
+                An order must be validated, fully allocated and reserved, not assigned to a wave, and have no existing pick list.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <Select value={manualOrder} onValueChange={setManualOrder}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select sales order" />
+              </SelectTrigger>
+              <SelectContent>
+                {eligibleOrders.map((o) => (
+                  <SelectItem key={o.id} value={o.id}>
+                    {o.id} · {o.customer} · {o.lines} line(s) / {o.units} units
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setManualOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={createManual} disabled={creating || eligibleOrders.length === 0}>
+              Generate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Alert className="mb-4 border-info/20 bg-info-soft">
         <AlertTitle>Released waves eligible for pick list generation</AlertTitle>
@@ -190,7 +235,12 @@ function PickListsPage() {
           toast.success("CSV export queued");
         }}
         filters={[
-          { key: "wave", label: "Wave", options: releasedWaves.map((w) => w.id), match: (r, v) => r.wave === v },
+          {
+            key: "wave",
+            label: "Wave",
+            options: ["None", ...releasedWaves.map((w) => w.id)],
+            match: (r, v) => (v === "None" ? !r.wave : r.wave === v),
+          },
           { key: "zone", label: "Zone", options: zones, match: (r, v) => r.zone === v },
           { key: "status", label: "Status", options: ["Pending", "In Progress", "Picked", "Short"], match: (r, v) => r.status === v },
         ]}
