@@ -14,13 +14,16 @@ import {
   listOrders,
   listPacking,
   listPickLines,
+  listPickableOrders,
   listShipments,
   listWaves,
 } from "./wms.server";
 import {
   allocateOrder,
   authorizeDispatch,
+  completeOrderPicking,
   completeWavePicking,
+  createManualPickList,
   confirmPick,
   confirmWaveReservation,
   createOrder,
@@ -163,6 +166,18 @@ export const releaseWaveFn = createServerFn({ method: "POST" })
 export const confirmWaveReservationFn = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => idOnly.parse(d))
   .handler(({ data }) => confirmWaveReservation(data.id));
+
+export const fetchPickableOrders = createServerFn({ method: "GET" }).handler(() => listPickableOrders());
+
+export const createManualPickListFn = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) =>
+    z.object({ order: z.string().trim().min(1).max(40), actor: z.string().trim().max(80).default("System") }).parse(d),
+  )
+  .handler(({ data }) => createManualPickList(data.order, data.actor));
+
+export const completeOrderPickingFn = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => z.object({ order: z.string().trim().min(1).max(40) }).parse(d))
+  .handler(({ data }) => completeOrderPicking(data.order));
 
 export const generatePickListsFn = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ wave: z.string().min(1).max(40) }).parse(d))
