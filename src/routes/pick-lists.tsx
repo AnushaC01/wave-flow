@@ -2,17 +2,26 @@ import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, FileText, Printer, RefreshCw } from "lucide-react";
+import { Download, FileText, Plus, Printer, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DataTable, type Column } from "@/components/wms/data-table";
 import { PageHeader } from "@/components/wms/page-header";
 import { StatCard } from "@/components/wms/stat-card";
 import { StatusBadge } from "@/components/wms/status-badge";
 import { useRole } from "@/context/role-context";
-import { errorMessage, pickLinesQuery, referenceQuery, WORKFLOW_KEYS, wavesQuery } from "@/lib/wms-queries";
-import { generatePickListsFn } from "@/lib/wms.functions";
+import {
+  errorMessage,
+  pickableOrdersQuery,
+  pickLinesQuery,
+  referenceQuery,
+  WORKFLOW_KEYS,
+  wavesQuery,
+} from "@/lib/wms-queries";
+import { createManualPickListFn, generatePickListsFn } from "@/lib/wms.functions";
 import type { PickLine } from "@/lib/wms-types";
 
 export const Route = createFileRoute("/pick-lists")({
