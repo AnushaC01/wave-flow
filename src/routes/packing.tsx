@@ -91,7 +91,7 @@ function PackingPage() {
   const columns: Column<PackingRecord>[] = [
     { key: "id", header: "Packing ID", value: (r) => r.id, render: (r) => <span className="font-medium text-primary">{r.id}</span> },
     { key: "order", header: "Sales Order", value: (r) => r.order },
-    { key: "wave", header: "Wave", value: (r) => r.wave },
+    { key: "wave", header: "Wave", value: (r) => r.wave || "None" },
     { key: "packageType", header: "Package Type", value: (r) => r.packageType },
     { key: "carton", header: "Carton", value: (r) => r.carton },
     { key: "weightKg", header: "Weight (kg)", value: (r) => r.weightKg, className: "num text-right" },
