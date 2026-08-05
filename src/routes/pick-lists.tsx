@@ -60,18 +60,28 @@ function downloadCsv(rows: PickLine[]) {
 }
 
 function PickListsPage() {
-  const { can } = useRole();
+  const { can, role } = useRole();
   const { data: pickLinesResult, isLoading } = useQuery(pickLinesQuery());
   const { data: wavesResult } = useQuery(wavesQuery());
   const { data: reference } = useQuery(referenceQuery());
+  const { data: pickableOrders } = useQuery(pickableOrdersQuery());
   const pickLines: PickLine[] = pickLinesResult?.rows ?? [];
   const waves = wavesResult?.rows ?? [];
   const zones = reference?.zones ?? [];
   const releasedWaves = waves.filter((w) => ["Released", "Picking", "Completed"].includes(w.status));
+  const eligibleOrders = pickableOrders ?? [];
 
   const generateServerFn = useServerFn(generatePickListsFn);
+  const manualServerFn = useServerFn(createManualPickListFn);
   const queryClient = useQueryClient();
   const [generating, setGenerating] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualOrder, setManualOrder] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  const refreshWorkflow = () => {
+    for (const key of WORKFLOW_KEYS) void queryClient.invalidateQueries({ queryKey: [key] });
+  };
 
   const generate = async () => {
     const targets = waves.filter((w) => w.status === "Released");
@@ -83,7 +93,7 @@ function PickListsPage() {
     try {
       const results = await Promise.all(targets.map((w) => generateServerFn({ data: { wave: w.id } })));
       const total = results.reduce((s: number, r) => s + (typeof r === "number" ? r : 0), 0);
-      for (const key of WORKFLOW_KEYS) void queryClient.invalidateQueries({ queryKey: [key] });
+      refreshWorkflow();
       toast.success("Pick lists generated", { description: `${total} pick lines across ${targets.length} released wave(s).` });
     } catch (err) {
       toast.error("Pick list generation failed", { description: errorMessage(err) });
@@ -92,9 +102,30 @@ function PickListsPage() {
     }
   };
 
+  const createManual = async () => {
+    if (!manualOrder) {
+      toast.error("Select an order", { description: "Choose an eligible sales order to create a pick list." });
+      return;
+    }
+    setCreating(true);
+    try {
+      const result = await manualServerFn({ data: { order: manualOrder, actor: role } });
+      refreshWorkflow();
+      toast.success("Pick list created", {
+        description: `${result.lines} pick line(s) created for ${result.order} — order is Ready for Picking.`,
+      });
+      setManualOpen(false);
+      setManualOrder("");
+    } catch (err) {
+      toast.error("Manual pick list creation failed", { description: errorMessage(err) });
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const columns: Column<PickLine>[] = [
     { key: "id", header: "Pick Line", value: (r) => r.id, render: (r) => <span className="font-medium text-primary">{r.id}</span> },
-    { key: "wave", header: "Wave Number", value: (r) => r.wave },
+    { key: "wave", header: "Wave Number", value: (r) => r.wave || "None" },
     { key: "picker", header: "Picker", value: (r) => r.picker },
     { key: "zone", header: "Warehouse Zone", value: (r) => r.zone },
     { key: "location", header: "Storage Location", value: (r) => r.location },
